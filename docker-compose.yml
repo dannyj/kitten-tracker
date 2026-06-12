@@ -1,0 +1,37 @@
+services:
+  kitten-app:
+    build: .
+    container_name: kitten-app
+    restart: unless-stopped
+    # No published ports on purpose: only Nginx Proxy Manager can reach the
+    # app, over the shared "kitten_proxy" network. Join NPM to it once with:
+    #   docker network connect kitten_proxy npm
+    env_file: .env
+    environment:
+      DATABASE_PATH: /data/kittens.db
+      PHOTOS_PATH: /photos
+    volumes:
+      - kitten-db:/data
+      - kitten-photos:/photos
+    networks:
+      - proxy
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /app/.next/cache
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+volumes:
+  kitten-db:
+  kitten-photos:
+
+networks:
+  proxy:
+    name: kitten_proxy
