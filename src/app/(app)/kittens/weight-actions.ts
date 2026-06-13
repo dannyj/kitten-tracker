@@ -1,6 +1,6 @@
 "use server";
 
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/db";
@@ -60,6 +60,89 @@ export async function addWeight(_prev: FormState, formData: FormData): Promise<F
     .run();
   revalidateKitten(kitten.id, kitten.litterId);
   return null;
+}
+
+export type BulkWeighState = {
+  error?: string;
+  /** Number of entries saved on the last successful submit. */
+  saved?: number;
+  /** Kitten ids that were saved — the form clears these inputs. */
+  savedKittenIds?: number[];
+  /** Per-kitten validation failures, keyed so the form can flag the right row. */
+  failures?: { kittenId: number; message: string }[];
+} | null;
+
+/**
+ * Record weights for several kittens at once (a litter weigh-in). Every kitten
+ * shares one weighing time; blank inputs are skipped. Valid rows are saved even
+ * if other rows fail validation, so a single bad number doesn't lose the rest.
+ */
+export async function addWeights(
+  _prev: BulkWeighState,
+  formData: FormData,
+): Promise<BulkWeighState> {
+  await requireUser();
+
+  const when = weighedAtSchema.safeParse(formData.get("weighedAt"));
+  if (!when.success) return { error: when.error.issues[0].message };
+  const litterId = z.coerce.number().int().positive().safeParse(formData.get("litterId"));
+
+  const failures: { kittenId: number; message: string }[] = [];
+  const toInsert: { kittenId: number; weightGrams: number }[] = [];
+
+  for (const [key, value] of formData.entries()) {
+    if (!key.startsWith("weight_")) continue;
+    if (typeof value !== "string" || value.trim() === "") continue;
+    const kittenId = Number(key.slice("weight_".length));
+    if (!Number.isInteger(kittenId) || kittenId <= 0) continue;
+
+    const grams = weightGramsSchema.safeParse(value);
+    if (!grams.success) {
+      failures.push({ kittenId, message: grams.error.issues[0].message });
+      continue;
+    }
+    toInsert.push({ kittenId, weightGrams: grams.data });
+  }
+
+  if (toInsert.length === 0) {
+    return failures.length > 0
+      ? { failures, saved: 0, savedKittenIds: [] }
+      : { error: "Enter at least one weight." };
+  }
+
+  const ids = toInsert.map((r) => r.kittenId);
+  const found = new Set(
+    db
+      .select({ id: kittens.id })
+      .from(kittens)
+      .where(inArray(kittens.id, ids))
+      .all()
+      .map((k) => k.id),
+  );
+
+  const savedKittenIds: number[] = [];
+  for (const row of toInsert) {
+    if (!found.has(row.kittenId)) {
+      failures.push({ kittenId: row.kittenId, message: "Kitten not found" });
+      continue;
+    }
+    db.insert(weightEntries)
+      .values({
+        kittenId: row.kittenId,
+        weighedAt: when.data,
+        weightGrams: row.weightGrams,
+        note: null,
+      })
+      .run();
+    revalidatePath(`/kittens/${row.kittenId}`);
+    savedKittenIds.push(row.kittenId);
+  }
+
+  revalidatePath("/kittens");
+  revalidatePath("/alerts");
+  if (litterId.success) revalidatePath(`/litters/${litterId.data}`);
+
+  return { saved: savedKittenIds.length, savedKittenIds, failures };
 }
 
 const updateWeightSchema = z.object({

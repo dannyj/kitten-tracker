@@ -7,6 +7,7 @@ import { db } from "@/db";
 import { kittens, litters, mothers } from "@/db/schema";
 import { requireUser } from "@/lib/auth/guard";
 import { formatDate } from "@/lib/dates";
+import { coverPhotoIdByKitten } from "@/lib/photo-data";
 import { ACTIVE_STATUSES } from "@/lib/status";
 import { weightPointsByKitten } from "@/lib/weight-data";
 import { WeighFlow, type WeighTarget } from "./weigh-flow";
@@ -36,9 +37,17 @@ export default async function WeighLitterPage({ params }: { params: Promise<{ id
     .all();
 
   const points = weightPointsByKitten(activeKittens.map((k) => k.id));
+  const covers = coverPhotoIdByKitten(
+    activeKittens.map((k) => ({ id: k.id, coverPhotoId: k.coverPhotoId })),
+  );
   const targets: WeighTarget[] = activeKittens.map((k) => {
     const kp = points.get(k.id) ?? [];
-    return { id: k.id, name: k.name, lastWeightGrams: kp.at(-1)?.weightGrams ?? null };
+    return {
+      id: k.id,
+      name: k.name,
+      lastWeightGrams: kp.at(-1)?.weightGrams ?? null,
+      coverPhotoId: covers.get(k.id) ?? null,
+    };
   });
 
   const title = `${mother ? `${mother.name}'s litter` : "Orphan litter"} · born ${formatDate(litter.birthDate)}`;

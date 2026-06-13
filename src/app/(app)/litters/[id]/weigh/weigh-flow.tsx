@@ -1,6 +1,7 @@
 "use client";
 
-import { Check, SkipForward } from "lucide-react";
+import { Cat, Check } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { useActionState, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -8,59 +9,104 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { WEIGHT_MAX_G, WEIGHT_MIN_G, WEIGHT_SOFT_MAX_G, WEIGHT_SOFT_MIN_G } from "@/lib/constants";
 import { toDatetimeLocal } from "@/lib/dates";
-import type { FormState } from "@/lib/forms";
-import { addWeight } from "../../../kittens/weight-actions";
+import { addWeights, type BulkWeighState } from "../../../kittens/weight-actions";
 
-export type WeighTarget = { id: number; name: string; lastWeightGrams: number | null };
-
-function initTimestamp(el: Element | RadioNodeList | null) {
-  if (el instanceof HTMLInputElement && !el.value) {
-    el.value = toDatetimeLocal(new Date());
-  }
-}
+export type WeighTarget = {
+  id: number;
+  name: string;
+  lastWeightGrams: number | null;
+  coverPhotoId: number | null;
+};
 
 export function WeighFlow({ litterId, kittens }: { litterId: number; kittens: WeighTarget[] }) {
-  const [index, setIndex] = useState(0);
-  const [recorded, setRecorded] = useState(0);
+  // Controlled inputs so we can clear rows that saved and keep ones that failed.
+  const [weights, setWeights] = useState<Record<number, string>>({});
+  const [when, setWhen] = useState(() => toDatetimeLocal(new Date()));
+  const [localError, setLocalError] = useState<string | null>(null);
+  const [done, setDone] = useState<number | null>(null);
 
-  const [state, formAction, pending] = useActionState<FormState, FormData>(
+  const [state, formAction, pending] = useActionState<BulkWeighState, FormData>(
     async (prev, formData) => {
-      const grams = Number(formData.get("weightGrams"));
-      if (
-        Number.isFinite(grams) &&
-        (grams < WEIGHT_SOFT_MIN_G || grams > WEIGHT_SOFT_MAX_G) &&
-        !window.confirm(
-          `${grams} g is outside the typical range (${WEIGHT_SOFT_MIN_G}–${WEIGHT_SOFT_MAX_G} g). Save it anyway?`,
-        )
-      ) {
-        return prev;
+      const result = await addWeights(prev, formData);
+      const savedIds = result?.savedKittenIds ?? [];
+      if (savedIds.length > 0) {
+        setWeights((w) => {
+          const next = { ...w };
+          for (const id of savedIds) delete next[id];
+          return next;
+        });
       }
-      const result = await addWeight(prev, formData);
-      if (!result) {
-        setRecorded((n) => n + 1);
-        setIndex((i) => i + 1);
+      // Everything entered saved cleanly → show the summary screen.
+      if (savedIds.length > 0 && (result?.failures?.length ?? 0) === 0) {
+        setDone(result?.saved ?? savedIds.length);
       }
       return result;
     },
     null,
   );
 
-  if (index >= kittens.length) {
+  const failureById = new Map((state?.failures ?? []).map((f) => [f.kittenId, f.message]));
+
+  function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setLocalError(null);
+    const filled = kittens
+      .map((k) => ({ k, value: (weights[k.id] ?? "").trim() }))
+      .filter(({ value }) => value !== "");
+
+    if (filled.length === 0) {
+      setLocalError("Enter at least one weight.");
+      return;
+    }
+
+    // One confirm for every out-of-range value, rather than one prompt per kitten.
+    const outliers = filled
+      .map(({ k, value }) => ({ k, grams: Number(value) }))
+      .filter(
+        ({ grams }) =>
+          Number.isFinite(grams) && (grams < WEIGHT_SOFT_MIN_G || grams > WEIGHT_SOFT_MAX_G),
+      );
+    if (outliers.length > 0) {
+      const list = outliers.map(({ k, grams }) => `• ${k.name}: ${grams} g`).join("\n");
+      if (
+        !window.confirm(
+          `These are outside the typical range (${WEIGHT_SOFT_MIN_G}–${WEIGHT_SOFT_MAX_G} g):\n\n${list}\n\nSave anyway?`,
+        )
+      ) {
+        return;
+      }
+    }
+
+    const fd = new FormData();
+    fd.set("weighedAt", when);
+    fd.set("litterId", String(litterId));
+    for (const { k, value } of filled) fd.set(`weight_${k.id}`, value);
+    formAction(fd);
+  }
+
+  if (done !== null) {
+    const remaining = kittens.length - done;
     return (
       <div className="flex flex-col items-center gap-4 rounded-lg border border-dashed py-16 text-center">
         <div className="flex size-12 items-center justify-center rounded-full bg-emerald-100">
           <Check className="size-6 text-emerald-700" aria-hidden />
         </div>
         <div>
-          <p className="font-medium">Weigh-in complete</p>
+          <p className="font-medium">Weigh-in saved</p>
           <p className="text-muted-foreground text-sm">
-            Recorded {recorded} of {kittens.length} kittens.
+            Recorded {done} {done === 1 ? "weight" : "weights"}
+            {remaining > 0 ? ` · ${remaining} not weighed` : ""}.
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap justify-center gap-2">
           <Button asChild variant="outline">
             <Link href={`/litters/${litterId}`}>View litter chart</Link>
           </Button>
+          {remaining > 0 ? (
+            <Button type="button" variant="outline" onClick={() => setDone(null)}>
+              Weigh the rest
+            </Button>
+          ) : null}
           <Button asChild>
             <Link href="/kittens">Done</Link>
           </Button>
@@ -69,83 +115,76 @@ export function WeighFlow({ litterId, kittens }: { litterId: number; kittens: We
     );
   }
 
-  const current = kittens[index];
-
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <p className="text-muted-foreground text-sm">
-          Kitten {index + 1} of {kittens.length}
-        </p>
-        <div className="bg-muted h-1.5 w-32 overflow-hidden rounded-full">
-          <div
-            className="bg-primary h-full transition-all"
-            style={{ width: `${(index / kittens.length) * 100}%` }}
-          />
-        </div>
+    <form onSubmit={onSubmit} className="flex flex-col gap-4">
+      <div className="flex flex-col gap-1.5 rounded-lg border p-4">
+        <Label htmlFor="weighedAt">When (applies to all)</Label>
+        <Input
+          id="weighedAt"
+          name="weighedAt"
+          type="datetime-local"
+          required
+          value={when}
+          onChange={(e) => setWhen(e.target.value)}
+        />
       </div>
 
-      <form
-        key={current.id}
-        action={formAction}
-        className="flex flex-col gap-3 rounded-lg border p-4"
-      >
-        <input type="hidden" name="kittenId" value={current.id} />
-        <div>
-          <h2 className="text-xl font-semibold">{current.name}</h2>
-          {current.lastWeightGrams !== null ? (
-            <p className="text-muted-foreground text-sm">
-              Last weight: {current.lastWeightGrams} g
-            </p>
-          ) : (
-            <p className="text-muted-foreground text-sm">No previous weight</p>
-          )}
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="weightGrams">Weight (g)</Label>
-          <Input
-            id="weightGrams"
-            name="weightGrams"
-            type="number"
-            inputMode="numeric"
-            min={WEIGHT_MIN_G}
-            max={WEIGHT_MAX_G}
-            required
-            autoFocus
-            placeholder="grams"
-            className="text-lg"
-          />
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="weighedAt">When</Label>
-          <Input
-            id="weighedAt"
-            name="weighedAt"
-            type="datetime-local"
-            required
-            ref={(el) => initTimestamp(el)}
-          />
-        </div>
-        <Input name="note" maxLength={500} placeholder="Note (optional)" />
-        {state?.error ? (
-          <p role="alert" className="text-destructive text-sm">
-            {state.error}
-          </p>
-        ) : null}
-        <div className="flex gap-2">
-          <Button type="submit" disabled={pending} className="flex-1">
-            {pending ? "Saving…" : index + 1 === kittens.length ? "Save & finish" : "Save & next"}
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={() => setIndex((i) => i + 1)}
-            disabled={pending}
-          >
-            <SkipForward className="size-4" aria-hidden /> Skip
-          </Button>
-        </div>
-      </form>
-    </div>
+      <ul className="flex flex-col gap-2">
+        {kittens.map((k) => {
+          const error = failureById.get(k.id);
+          return (
+            <li key={k.id} className="flex items-center gap-3 rounded-lg border p-3">
+              {k.coverPhotoId ? (
+                <Image
+                  src={`/api/photos/${k.coverPhotoId}?thumb=1`}
+                  alt=""
+                  width={56}
+                  height={56}
+                  unoptimized
+                  className="size-14 shrink-0 rounded-full object-cover"
+                />
+              ) : (
+                <span className="bg-muted flex size-14 shrink-0 items-center justify-center rounded-full">
+                  <Cat className="text-muted-foreground size-7" aria-hidden />
+                </span>
+              )}
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-medium">{k.name}</p>
+                <p className="text-muted-foreground text-xs">
+                  {k.lastWeightGrams !== null ? `Last: ${k.lastWeightGrams} g` : "No previous weight"}
+                </p>
+                {error ? (
+                  <p role="alert" className="text-destructive text-xs">
+                    {error}
+                  </p>
+                ) : null}
+              </div>
+              <Input
+                type="number"
+                inputMode="numeric"
+                min={WEIGHT_MIN_G}
+                max={WEIGHT_MAX_G}
+                placeholder="grams"
+                aria-label={`Weight for ${k.name} in grams`}
+                aria-invalid={error ? true : undefined}
+                value={weights[k.id] ?? ""}
+                onChange={(e) => setWeights((w) => ({ ...w, [k.id]: e.target.value }))}
+                className="w-24 shrink-0 text-lg"
+              />
+            </li>
+          );
+        })}
+      </ul>
+
+      {localError ?? state?.error ? (
+        <p role="alert" className="text-destructive text-sm">
+          {localError ?? state?.error}
+        </p>
+      ) : null}
+
+      <Button type="submit" disabled={pending}>
+        {pending ? "Saving…" : "Save all weights"}
+      </Button>
+    </form>
   );
 }

@@ -66,22 +66,22 @@ try {
   await page.waitForFunction(() => !document.body.textContent.includes("152 g"));
   check("weight deletable within window (manage view)", true);
 
-  // ---- AC1b: litter weigh-in flow ----
+  // ---- AC1b: litter weigh-in flow (bulk: enter all weights, save once) ----
   // Litter B is the orphan overview litter (4 active kittens).
   const eenHref = await kittenIdByName("Een");
   await page.goto(`${BASE}${eenHref}`);
   await page.click("a:has-text('Weigh litter')");
   await page.waitForURL(/\/litters\/\d+\/weigh/);
-  let steps = 0;
-  for (let i = 0; i < 6; i++) {
-    if (await page.locator("text=Weigh-in complete").count()) break;
-    await page.fill("#weightGrams", String(170 + i));
-    await page.click("button:has-text('Save &')");
-    await page.waitForTimeout(400);
-    steps++;
+  // One numeric input per active kitten, plus the shared "When" field.
+  await page.waitForSelector("input[aria-label^='Weight for']");
+  const weightInputs = page.locator("input[aria-label^='Weight for']");
+  const inputCount = await weightInputs.count();
+  for (let i = 0; i < inputCount; i++) {
+    await weightInputs.nth(i).fill(String(170 + i));
   }
-  await page.waitForSelector("text=Weigh-in complete");
-  check("AC1: litter weigh-in records all siblings in sequence", steps === 4, `steps: ${steps}`);
+  await page.click("button:has-text('Save all weights')");
+  await page.waitForSelector("text=Weigh-in saved");
+  check("AC1: litter weigh-in records all siblings at once", inputCount === 4, `inputs: ${inputCount}`);
 
   // ---- AC2: per-kitten chart + trend matches hand calc ----
   const okkieHref = await kittenIdByName("Okkie");

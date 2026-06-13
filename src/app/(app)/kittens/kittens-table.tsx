@@ -67,14 +67,14 @@ export function KittensTable({ rows }: { rows: KittenRowView[] }) {
                       <Image
                         src={`/api/photos/${kitten.coverPhotoId}?thumb=1`}
                         alt=""
-                        width={28}
-                        height={28}
+                        width={40}
+                        height={40}
                         unoptimized
-                        className="size-7 shrink-0 rounded-full object-cover"
+                        className="size-10 shrink-0 rounded-full object-cover"
                       />
                     ) : (
-                      <span className="bg-muted flex size-7 shrink-0 items-center justify-center rounded-full">
-                        <Cat className="text-muted-foreground size-3.5" aria-hidden />
+                      <span className="bg-muted flex size-10 shrink-0 items-center justify-center rounded-full">
+                        <Cat className="text-muted-foreground size-5" aria-hidden />
                       </span>
                     )}
                     <span className="flex items-center gap-1.5 font-medium">
