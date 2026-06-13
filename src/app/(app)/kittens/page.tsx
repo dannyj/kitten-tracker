@@ -13,6 +13,7 @@ import { alertsByKitten } from "@/lib/weight-data";
 import { FilterBar } from "./filter-bar";
 import { KittensTable, type KittenRowView } from "./kittens-table";
 import { litterOptionList } from "./litter-options";
+import { WeighLitterButton } from "./weigh-litter-button";
 
 export const metadata = { title: "Kittens — Kitten Tracker" };
 
@@ -89,22 +90,39 @@ export default async function KittensPage({
 
   const litterOptions = litterOptionList();
 
+  // Litters with at least one active kitten — the only ones worth weighing.
+  const activeLitterIds = new Set(
+    db
+      .selectDistinct({ litterId: kittens.litterId })
+      .from(kittens)
+      .where(inArray(kittens.status, ACTIVE_STATUSES))
+      .all()
+      .map((r) => r.litterId)
+      .filter((id): id is number => id !== null),
+  );
+  const weighableLitters = litterOptions.filter((l) => activeLitterIds.has(l.id));
+
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Kittens</h1>
-        <div className="flex gap-2">
-          <Button asChild variant="outline">
-            <Link href="/litters/new">
-              <Plus className="size-4" aria-hidden /> Litter
-            </Link>
-          </Button>
-          <Button asChild>
-            <Link href="/kittens/new">
-              <Plus className="size-4" aria-hidden /> Kitten
-            </Link>
-          </Button>
+      <div className="flex flex-col gap-4">
+        <div className="flex items-center justify-between gap-2">
+          <h1 className="text-2xl font-semibold">Kittens</h1>
+          {/* Create actions, kept visually quiet (outline) and apart from the
+              primary "Weigh litter" action below to avoid mis-taps. */}
+          <div className="flex gap-2">
+            <Button asChild variant="outline">
+              <Link href="/litters/new">
+                <Plus className="size-4" aria-hidden /> Litter
+              </Link>
+            </Button>
+            <Button asChild variant="outline">
+              <Link href="/kittens/new">
+                <Plus className="size-4" aria-hidden /> Kitten
+              </Link>
+            </Button>
+          </div>
         </div>
+        <WeighLitterButton litters={weighableLitters.map(({ id, label }) => ({ id, label }))} />
       </div>
 
       <FilterBar litterOptions={litterOptions.map(({ id, label }) => ({ id, label }))} />

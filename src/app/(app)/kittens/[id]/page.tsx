@@ -355,7 +355,7 @@ export default async function KittenDetailPage({ params }: { params: Promise<{ i
           </Card>
 
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between gap-2">
+            <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
                 <Scale className="size-4" aria-hidden /> Weights
                 {alert && alert.avgDailyGainG !== null && alert.trend ? (
@@ -364,9 +364,6 @@ export default async function KittenDetailPage({ params }: { params: Promise<{ i
                   </span>
                 ) : null}
               </CardTitle>
-              <Button asChild size="sm" variant="outline">
-                <Link href={`/litters/${kitten.litterId}/weigh`}>Weigh litter</Link>
-              </Button>
             </CardHeader>
             <CardContent className="flex flex-col gap-4">
               <GrowthChart points={growthSeries} />
