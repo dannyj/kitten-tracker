@@ -288,11 +288,14 @@ export function FeedingCard({
   intervalMinutes,
   latestWeightG,
   rows,
+  manage = false,
 }: {
   kittenId: number;
   intervalMinutes: number;
   latestWeightG: number | null;
   rows: FeedingRow[];
+  /** Manage mode: just the entries with edit/delete (no countdown/quick-add/intake). */
+  manage?: boolean;
 }) {
   const [editingId, setEditingId] = useState<number | null>(null);
   const now = useNow();
@@ -300,10 +303,18 @@ export function FeedingCard({
 
   return (
     <div className="flex flex-col gap-4">
-      <Countdown lastFedMs={lastFedMs} intervalMinutes={intervalMinutes} />
-      <IntervalEditor kittenId={kittenId} intervalMinutes={intervalMinutes} />
-      <FeedingQuickAdd kittenId={kittenId} />
-      <IntakeSummary rows={rows} latestWeightG={latestWeightG} intervalMinutes={intervalMinutes} />
+      {manage ? null : (
+        <>
+          <Countdown lastFedMs={lastFedMs} intervalMinutes={intervalMinutes} />
+          <IntervalEditor kittenId={kittenId} intervalMinutes={intervalMinutes} />
+          <FeedingQuickAdd kittenId={kittenId} />
+          <IntakeSummary
+            rows={rows}
+            latestWeightG={latestWeightG}
+            intervalMinutes={intervalMinutes}
+          />
+        </>
+      )}
 
       {rows.length === 0 ? (
         <p className="text-muted-foreground text-sm">No feeds recorded yet.</p>
@@ -312,7 +323,8 @@ export function FeedingCard({
           {rows.map((row, i) => {
             const older = rows[i + 1]; // newest-first
             const gap = older ? timeSince(row.fedAtMs - older.fedAtMs) : null;
-            const editable = now !== null && now - row.createdAtMs < FEEDING_EDIT_WINDOW_MS;
+            const editable =
+              manage && now !== null && now - row.createdAtMs < FEEDING_EDIT_WINDOW_MS;
             return (
               <li key={row.id} className="rounded-lg border p-3">
                 <div className="flex items-center justify-between gap-2">

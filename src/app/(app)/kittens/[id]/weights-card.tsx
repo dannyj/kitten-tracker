@@ -194,13 +194,22 @@ function DeleteButton({ weightId }: { weightId: number }) {
   );
 }
 
-export function WeightsCard({ kittenId, rows }: { kittenId: number; rows: WeightRow[] }) {
+export function WeightsCard({
+  kittenId,
+  rows,
+  manage = false,
+}: {
+  kittenId: number;
+  rows: WeightRow[];
+  /** Manage mode: hide quick-add, show per-entry edit/delete (correction view). */
+  manage?: boolean;
+}) {
   const [editingId, setEditingId] = useState<number | null>(null);
   const now = useNow();
 
   return (
     <div className="flex flex-col gap-4">
-      <QuickAdd kittenId={kittenId} />
+      {manage ? null : <QuickAdd kittenId={kittenId} />}
 
       {rows.length === 0 ? (
         <p className="text-muted-foreground text-sm">No weights recorded yet.</p>
@@ -209,7 +218,8 @@ export function WeightsCard({ kittenId, rows }: { kittenId: number; rows: Weight
           {rows.map((row, i) => {
             const older = rows[i + 1]; // rows are newest-first
             const delta = older ? row.weightGrams - older.weightGrams : null;
-            const editable = now !== null && now - row.createdAtMs < WEIGHT_EDIT_WINDOW_MS;
+            const editable =
+              manage && now !== null && now - row.createdAtMs < WEIGHT_EDIT_WINDOW_MS;
             return (
               <li key={row.id} className="rounded-lg border p-3">
                 <div className="flex items-center justify-between gap-2">

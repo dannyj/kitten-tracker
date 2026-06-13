@@ -28,7 +28,11 @@ try {
   const csp = h["content-security-policy"] || "";
   const scriptSrc = csp.split(";").find((p) => p.trim().startsWith("script-src")) || "";
   check("AC6: CSP present", csp.length > 0);
-  check("AC6: script-src has no unsafe-inline", csp.length > 0 && !scriptSrc.includes("unsafe-inline"), scriptSrc.trim());
+  check(
+    "AC6: script-src has no unsafe-inline",
+    csp.length > 0 && !scriptSrc.includes("unsafe-inline"),
+    scriptSrc.trim(),
+  );
   check("AC6: frame-ancestors none", csp.includes("frame-ancestors 'none'"));
   check("AC6: X-Content-Type-Options nosniff", h["x-content-type-options"] === "nosniff");
   check("AC6: Referrer-Policy set", !!h["referrer-policy"]);
@@ -60,7 +64,10 @@ try {
 
   // ---- AC3: admin sees settings form ----
   await page.goto(`${BASE}/settings`);
-  check("AC3: admin can edit settings (form present)", (await page.locator("#minDailyGainG").count()) > 0);
+  check(
+    "AC3: admin can edit settings (form present)",
+    (await page.locator("#minDailyGainG").count()) > 0,
+  );
 
   // ---- AC3: non-admin cannot reach settings UI ----
   const vctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
@@ -69,7 +76,10 @@ try {
   await vpage.goto(`${BASE}/settings`);
   const vSettings = await vpage.textContent("body");
   check("AC3: viewer settings page is admin-only", /admin-only/i.test(vSettings));
-  check("AC3: viewer cannot see settings form", (await vpage.locator("#minDailyGainG").count()) === 0);
+  check(
+    "AC3: viewer cannot see settings form",
+    (await vpage.locator("#minDailyGainG").count()) === 0,
+  );
 
   // ---- AC3: non-admin cannot read adopter PII via the export route ----
   // (Bram is adopted with adopter PII; viewer opt-in must be ignored server-side.)

@@ -134,11 +134,14 @@ export function MedicalCard({
   templates,
   rows,
   dueItems,
+  manage = false,
 }: {
   kittenId: number;
   templates: ScheduleTemplate[];
   rows: VaccinationRow[];
   dueItems: DueItem[];
+  /** Manage mode: entries with edit/delete/correct (no due list or quick-add). */
+  manage?: boolean;
 }) {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [correctingId, setCorrectingId] = useState<number | null>(null);
@@ -147,7 +150,7 @@ export function MedicalCard({
 
   return (
     <div className="flex flex-col gap-4">
-      {dueItems.length > 0 ? (
+      {!manage && dueItems.length > 0 ? (
         <div className="flex flex-col gap-2">
           {dueItems.map((item) => {
             const days = daysUntil(item.dueDateIso, today);
@@ -182,14 +185,16 @@ export function MedicalCard({
         </div>
       ) : null}
 
-      <VaccinationQuickAdd kittenId={kittenId} templates={templates} />
+      {manage ? null : <VaccinationQuickAdd kittenId={kittenId} templates={templates} />}
 
       {rows.length === 0 ? (
         <p className="text-muted-foreground text-sm">No medical entries yet.</p>
       ) : (
         <ul className="flex flex-col gap-2">
           {rows.map((row) => {
-            const editable = now !== null && now - row.createdAtMs < VACCINATION_EDIT_WINDOW_MS;
+            const inWindow = now !== null && now - row.createdAtMs < VACCINATION_EDIT_WINDOW_MS;
+            const editable = manage && inWindow;
+            const showControls = manage;
             return (
               <li key={row.id} className="rounded-lg border p-3">
                 <div className="flex items-center justify-between gap-2">
@@ -212,7 +217,7 @@ export function MedicalCard({
                 </div>
                 {row.note ? <p className="mt-1 text-sm">{row.note}</p> : null}
 
-                {editingId === row.id ? (
+                {!showControls ? null : editingId === row.id ? (
                   <EditForm row={row} templates={templates} onDone={() => setEditingId(null)} />
                 ) : correctingId === row.id ? (
                   <CorrectForm

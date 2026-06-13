@@ -4,6 +4,8 @@ import { asc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { adopters, kittens, litters, mothers, vaccinations, weightEntries } from "@/db/schema";
 import { formatAge } from "@/lib/dates";
+import { buildKittenGrowthSeries, type GrowthChartPoint } from "@/lib/growth";
+import { getAlertSettings } from "@/lib/settings";
 import { STATUS_LABELS } from "@/lib/status";
 
 export type ExportVaccination = {
@@ -33,6 +35,8 @@ export type ExportAdopter = {
   shelterReference: string | null;
 };
 
+export type ExportWeight = { dateIso: string; grams: number; note: string | null };
+
 export type KittenExport = {
   id: number;
   name: string;
@@ -44,6 +48,10 @@ export type KittenExport = {
   statusLabel: string;
   vaccinations: ExportVaccination[];
   growth: ExportGrowth | null;
+  /** Full weight history (chronological) for the data table. */
+  weights: ExportWeight[];
+  /** Chart series with the expected-growth band, for the rendered chart. */
+  growthSeries: GrowthChartPoint[];
   adopter: ExportAdopter | null;
 };
 
@@ -112,7 +120,34 @@ function buildAdopter(kittenId: number): ExportAdopter | null {
   };
 }
 
+function buildWeights(kittenId: number): { weights: ExportWeight[]; series: GrowthChartPoint[] } {
+  const rows = db
+    .select({
+      weighedAt: weightEntries.weighedAt,
+      weightGrams: weightEntries.weightGrams,
+      note: weightEntries.note,
+    })
+    .from(weightEntries)
+    .where(eq(weightEntries.kittenId, kittenId))
+    .orderBy(asc(weightEntries.weighedAt), asc(weightEntries.id))
+    .all();
+  const settings = getAlertSettings();
+  const series = buildKittenGrowthSeries(
+    rows.map((r) => ({ weighedAtMs: r.weighedAt.getTime(), weightGrams: r.weightGrams })),
+    { minDailyGainG: settings.minDailyGainG, targetDailyGainG: settings.targetDailyGainG },
+  );
+  return {
+    weights: rows.map((r) => ({
+      dateIso: isoDate(r.weighedAt),
+      grams: r.weightGrams,
+      note: r.note,
+    })),
+    series,
+  };
+}
+
 function buildKitten(kitten: typeof kittens.$inferSelect, includeAdopter: boolean): KittenExport {
+  const { weights, series } = buildWeights(kitten.id);
   return {
     id: kitten.id,
     name: kitten.name,
@@ -124,6 +159,8 @@ function buildKitten(kitten: typeof kittens.$inferSelect, includeAdopter: boolea
     statusLabel: STATUS_LABELS[kitten.status],
     vaccinations: buildVaccinations(kitten.id),
     growth: buildGrowth(kitten.id),
+    weights,
+    growthSeries: series,
     adopter: includeAdopter ? buildAdopter(kitten.id) : null,
   };
 }

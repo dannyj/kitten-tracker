@@ -2,6 +2,7 @@ import "server-only";
 
 import PDFDocument from "pdfkit";
 import { formatDate } from "@/lib/dates";
+import { buildChartGeometry, type ChartGeometry } from "@/lib/export-chart";
 import type { KittenExport } from "@/lib/export-data";
 
 // Standard Helvetica only (WinAnsi covers accents like ë/ï); never emoji — they
@@ -9,6 +10,80 @@ import type { KittenExport } from "@/lib/export-data";
 // so user input is never interpreted as markup.
 
 export type ExportMeta = { generatedAtIso: string; fosterName: string; includesAdopter: boolean };
+
+/** Draw the growth chart with pdfkit vector primitives at the current cursor. */
+function drawGrowthChart(doc: PDFKit.PDFDocument, g: ChartGeometry) {
+  const ox = doc.page.margins.left;
+  const oy = doc.y;
+
+  // Expected-growth band.
+  if (g.band && g.band.length > 0) {
+    doc.save().fillColor("#16a34a").fillOpacity(0.12);
+    doc.moveTo(ox + g.band[0].x, oy + g.band[0].y);
+    for (const p of g.band.slice(1)) doc.lineTo(ox + p.x, oy + p.y);
+    doc.closePath().fill();
+    doc.restore();
+  }
+
+  // Y gridlines + labels.
+  doc.font("Helvetica").fontSize(8).fillColor("#666");
+  for (const t of g.yTicks) {
+    doc
+      .save()
+      .strokeColor("#eeeeee")
+      .lineWidth(1)
+      .moveTo(ox + g.area.x, oy + t.y)
+      .lineTo(ox + g.area.x + g.area.w, oy + t.y)
+      .stroke()
+      .restore();
+    doc.text(t.label, ox + g.area.x - 34, oy + t.y - 4, { width: 30, align: "right" });
+  }
+
+  // Axes.
+  doc
+    .save()
+    .strokeColor("#999999")
+    .lineWidth(1)
+    .moveTo(ox + g.area.x, oy + g.area.y)
+    .lineTo(ox + g.area.x, oy + g.area.y + g.area.h)
+    .lineTo(ox + g.area.x + g.area.w, oy + g.area.y + g.area.h)
+    .stroke()
+    .restore();
+
+  // Weight line + points.
+  doc.save().strokeColor("#2563eb").lineWidth(2);
+  doc.moveTo(ox + g.line[0].x, oy + g.line[0].y);
+  for (const p of g.line.slice(1)) doc.lineTo(ox + p.x, oy + p.y);
+  doc.stroke().restore();
+  doc.save().fillColor("#2563eb");
+  for (const p of g.line) doc.circle(ox + p.x, oy + p.y, 2).fill();
+  doc.restore();
+
+  // X tick labels.
+  doc.font("Helvetica").fontSize(8).fillColor("#666");
+  for (const t of g.xTicks) {
+    doc.text(t.label, ox + t.x - 15, oy + g.height - 10, { width: 30, align: "center" });
+  }
+
+  doc.fillColor("#000");
+  doc.x = ox;
+  doc.y = oy + g.height + 6;
+}
+
+function weightTableRow(doc: PDFKit.PDFDocument, date: string, weight: string, note: string) {
+  // Explicit-coordinate columns don't advance the cursor on their own (and an
+  // empty cell advances nothing), so we lay out each row at a fixed y and step
+  // down by a measured row height ourselves.
+  if (doc.y > doc.page.height - doc.page.margins.bottom - 24) doc.addPage();
+  const ox = doc.page.margins.left;
+  const y = doc.y;
+  const rowH = Math.max(13, doc.heightOfString(note || " ", { width: 320 }));
+  doc.text(date, ox, y, { width: 90, lineBreak: false });
+  doc.text(weight, ox + 95, y, { width: 60, lineBreak: false });
+  doc.text(note, ox + 160, y, { width: 320 });
+  doc.x = ox;
+  doc.y = y + rowH;
+}
 
 function header(doc: PDFKit.PDFDocument, title: string, meta: ExportMeta) {
   doc.font("Helvetica-Bold").fontSize(18).text(title);
@@ -56,6 +131,22 @@ function kittenSection(doc: PDFKit.PDFDocument, k: KittenExport, meta: ExportMet
     labelValue(doc, "Average gain", g.avgGainPerDay !== null ? `${g.avgGainPerDay} g/day` : "—");
   } else {
     doc.font("Helvetica").fontSize(10).text("No weights recorded.");
+  }
+
+  // Growth chart (vector — no browser, no image rasterisation) + weight table.
+  const geometry = buildChartGeometry(k.growthSeries, 480, 180);
+  if (geometry) {
+    doc.moveDown(0.3);
+    drawGrowthChart(doc, geometry);
+  }
+  if (k.weights.length > 0) {
+    doc.moveDown(0.4).font("Helvetica-Bold").fontSize(11).text("Weight history");
+    doc.font("Helvetica-Bold").fontSize(9);
+    weightTableRow(doc, "Date", "Weight", "Note");
+    doc.font("Helvetica").fontSize(9);
+    for (const w of k.weights) {
+      weightTableRow(doc, formatDate(w.dateIso), `${w.grams} g`, w.note ?? "");
+    }
   }
 
   // Vaccination / medical history

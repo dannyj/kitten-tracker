@@ -23,7 +23,9 @@ async function login() {
 
 async function kittenHref(name) {
   await page.goto(`${BASE}/kittens?status=all`);
-  return page.locator(`tr:has-text("${name}") a[href^="/kittens/"]`).first().getAttribute("href");
+  await page.locator(`tr:has-text("${name}") td`).last().click();
+  await page.waitForURL(/\/kittens\/\d+$/);
+  return new URL(page.url()).pathname;
 }
 
 async function noOverflow() {
@@ -149,25 +151,29 @@ try {
     feedingText.includes("No feeds yet") && !feedingText.includes("overdue by"),
   );
 
-  // ---- AC7: edit/delete honor the 15-min window (the just-added 9ml on Mauw is fresh) ----
+  // ---- AC7: edit/delete honor the 15-min window — now on the manage view (rev 1) ----
+  // Detail feeding section is read-only; controls moved to /feedings.
   await page.goto(`${BASE}${mauw}`);
-  await page.click("#feeding li:has-text('9 ml') button:has-text('Edit')");
-  await page.waitForSelector("#feeding li input[name=amountMl]");
-  await page.fill("#feeding li input[name=amountMl]", "10");
-  await page.click("#feeding li button:has-text('Save')");
-  await page.waitForSelector("#feeding li:has-text('10 ml')");
-  check("AC7: feed editable within window", true);
-  page.once("dialog", (d) => d.accept());
-  await page.click("#feeding li:has-text('10 ml') button:has-text('Delete')");
-  await page.waitForFunction(
-    () => !document.querySelector("#feeding")?.textContent.includes("10 ml"),
+  check(
+    "AC7: detail feeding section is read-only (no inline edit)",
+    (await page.locator("#feeding li button:has-text('Edit')").count()) === 0,
   );
-  check("AC7: feed deletable within window", true);
-  // seeded (locked) feeds on Hidde show no edit/delete
-  await page.goto(`${BASE}${hidde}`);
+  await page.goto(`${BASE}${mauw}/feedings`);
+  await page.click("li:has-text('9 ml') button:has-text('Edit')");
+  await page.waitForSelector("li input[name=amountMl]");
+  await page.fill("li input[name=amountMl]", "10");
+  await page.click("li button:has-text('Save')");
+  await page.waitForSelector("li:has-text('10 ml')");
+  check("AC7: feed editable within window (manage view)", true);
+  page.once("dialog", (d) => d.accept());
+  await page.click("li:has-text('10 ml') button:has-text('Delete')");
+  await page.waitForFunction(() => !document.body.textContent.includes("10 ml"));
+  check("AC7: feed deletable within window (manage view)", true);
+  // seeded (locked) feeds on Hidde show no edit/delete in the manage view
+  await page.goto(`${BASE}${hidde}/feedings`);
   check(
     "AC7: locked feeds have no edit button",
-    (await page.locator("#feeding li button:has-text('Edit')").count()) === 0,
+    (await page.locator("li button:has-text('Edit')").count()) === 0,
   );
 
   // ---- AC4: dashboard panel sorted soonest-due, overdue pinned, one-tap log prefilled ----

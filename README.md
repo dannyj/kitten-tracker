@@ -76,17 +76,23 @@ Automated, online-safe (uses SQLite `VACUUM INTO`, not a naive copy of a live fi
 ```bash
 scripts/backup.sh                     # writes ~/kitten-backups/kittens-TS.db + photos-TS.tgz
 ```
+
 Schedule nightly via cron on the host:
+
 ```cron
 0 3 * * * /home/danny/Documents/repos/kitten_app/scripts/backup.sh >> /home/danny/kitten-backups/backup.log 2>&1
 ```
+
 Retention: last 14 days (`RETAIN_DAYS`). **Copy backups off the server** (rsync/scp to another machine) — a backup that only lives on the box it protects isn't a backup.
 
 **Restore** (replaces current data — verify the files first):
+
 ```bash
 scripts/restore.sh ~/kitten-backups/kittens-TS.db ~/kitten-backups/photos-TS.tgz
 ```
-**Tested restore procedure** (verify a backup into a *throwaway* set of volumes, no risk to live data):
+
+**Tested restore procedure** (verify a backup into a _throwaway_ set of volumes, no risk to live data):
+
 ```bash
 docker run --rm -v rt_db:/data -v ~/kitten-backups:/in alpine cp /in/kittens-TS.db /data/kittens.db
 docker run --rm -v rt_photos:/photos -v ~/kitten-backups:/in alpine sh -c 'tar xzf /in/photos-TS.tgz -C /photos'
@@ -94,11 +100,12 @@ docker run --rm -v rt_db:/data -e DATABASE_PATH=/data/kittens.db kitten_app-kitt
   node -e "const d=require('better-sqlite3')(process.env.DATABASE_PATH); console.log('kittens', d.prepare('select count(*) c from kittens').get().c, 'photos', d.prepare('select count(*) c from photos').get().c)"
 docker volume rm rt_db rt_photos
 ```
+
 The full backup→wipe→restore cycle is verified to reproduce all rows and photo files.
 
 ## Internet-exposure runbook (prepared, not enabled)
 
-The app holds adopter PII (names, phones, addresses). **Recommended: reach it over a VPN** (Tailscale/WireGuard) rather than publishing the login form — same remote access, almost none of the credential-stuffing/bot exposure, near-zero effort. Direct public exposure is defensible *only* with the whole checklist below in place first.
+The app holds adopter PII (names, phones, addresses). **Recommended: reach it over a VPN** (Tailscale/WireGuard) rather than publishing the login form — same remote access, almost none of the credential-stuffing/bot exposure, near-zero effort. Direct public exposure is defensible _only_ with the whole checklist below in place first.
 
 Pre-exposure checklist:
 

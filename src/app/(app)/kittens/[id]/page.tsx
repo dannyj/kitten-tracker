@@ -1,5 +1,6 @@
 import { asc, desc, eq } from "drizzle-orm";
-import { Camera, LineChart, Milk, Pencil, Pill, Scale, UtensilsCrossed } from "lucide-react";
+import { Camera, Cat, LineChart, Milk, Pencil, Pill, Scale, UtensilsCrossed } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { z } from "zod";
@@ -126,6 +127,8 @@ export default async function KittenDetailPage({ params }: { params: Promise<{ i
     createdAtMs: v.createdAt.getTime(),
   }));
   const kittenPhotos = getSubjectPhotos("kitten", kitten.id);
+  // Cover photo for the header: chosen cover, else most recent, else placeholder.
+  const coverPhotoId = kitten.coverPhotoId ?? kittenPhotos.at(-1)?.id ?? null;
   const scheduleTemplatesList = getScheduleTemplates();
   // Count administered events (originals only, not corrections) per type.
   const givenCountByType: Record<string, number> = {};
@@ -160,26 +163,42 @@ export default async function KittenDetailPage({ params }: { params: Promise<{ i
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-6">
       <div className="flex flex-wrap items-start justify-between gap-2">
-        <div>
-          <h1 className="flex items-center gap-2 text-2xl font-semibold">
-            {kitten.name}
-            {kitten.handFeeding ? (
-              <span
-                className="inline-flex items-center gap-1 rounded-full bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-900"
-                title="Hand-feeding"
-              >
-                <Milk className="size-3" aria-hidden /> hand-fed
-              </span>
-            ) : null}
-          </h1>
-          <p className="text-muted-foreground mt-1 flex flex-wrap items-center gap-2 text-sm">
-            {kitten.shelterNumber ? <span>#{kitten.shelterNumber}</span> : null}
-            <span>{age ? `${age} old` : "age unknown"}</span>
-            {deathDate ? (
-              <span>(at {formatDate(deathDate.toISOString().slice(0, 10))})</span>
-            ) : null}
-            <StatusBadge status={kitten.status} />
-          </p>
+        <div className="flex items-start gap-3">
+          {coverPhotoId ? (
+            <Image
+              src={`/api/photos/${coverPhotoId}?thumb=1`}
+              alt={`${kitten.name}`}
+              width={64}
+              height={64}
+              unoptimized
+              className="size-16 shrink-0 rounded-lg object-cover"
+            />
+          ) : (
+            <span className="bg-muted flex size-16 shrink-0 items-center justify-center rounded-lg">
+              <Cat className="text-muted-foreground size-7" aria-hidden />
+            </span>
+          )}
+          <div>
+            <h1 className="flex items-center gap-2 text-2xl font-semibold">
+              {kitten.name}
+              {kitten.handFeeding ? (
+                <span
+                  className="inline-flex items-center gap-1 rounded-full bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-900"
+                  title="Hand-feeding"
+                >
+                  <Milk className="size-3" aria-hidden /> hand-fed
+                </span>
+              ) : null}
+            </h1>
+            <p className="text-muted-foreground mt-1 flex flex-wrap items-center gap-2 text-sm">
+              {kitten.shelterNumber ? <span>#{kitten.shelterNumber}</span> : null}
+              <span>{age ? `${age} old` : "age unknown"}</span>
+              {deathDate ? (
+                <span>(at {formatDate(deathDate.toISOString().slice(0, 10))})</span>
+              ) : null}
+              <StatusBadge status={kitten.status} />
+            </p>
+          </div>
         </div>
         <Button asChild variant="outline" size="sm">
           <Link href={`/kittens/${kitten.id}/edit`}>
@@ -357,6 +376,14 @@ export default async function KittenDetailPage({ params }: { params: Promise<{ i
                 </Link>
               </Button>
               <WeightsCard kittenId={kitten.id} rows={cardRows} />
+              {cardRows.length > 0 ? (
+                <Link
+                  href={`/kittens/${kitten.id}/weights`}
+                  className="text-muted-foreground self-start text-xs underline underline-offset-2"
+                >
+                  Manage entries
+                </Link>
+              ) : null}
             </CardContent>
           </Card>
 
@@ -367,13 +394,21 @@ export default async function KittenDetailPage({ params }: { params: Promise<{ i
                   <UtensilsCrossed className="size-4" aria-hidden /> Hand-feeding
                 </CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="flex flex-col gap-4">
                 <FeedingCard
                   kittenId={kitten.id}
                   intervalMinutes={kitten.feedingIntervalMinutes}
                   latestWeightG={latestWeightG}
                   rows={feedingRows}
                 />
+                {feedingRows.length > 0 ? (
+                  <Link
+                    href={`/kittens/${kitten.id}/feedings`}
+                    className="text-muted-foreground self-start text-xs underline underline-offset-2"
+                  >
+                    Manage entries
+                  </Link>
+                ) : null}
               </CardContent>
             </Card>
           ) : null}
@@ -387,13 +422,21 @@ export default async function KittenDetailPage({ params }: { params: Promise<{ i
                 <Link href={`/export/kitten/${kitten.id}`}>Export</Link>
               </Button>
             </CardHeader>
-            <CardContent>
+            <CardContent className="flex flex-col gap-4">
               <MedicalCard
                 kittenId={kitten.id}
                 templates={scheduleTemplatesList}
                 rows={vaccinationRows}
                 dueItems={dueItems}
               />
+              {vaccinationRows.length > 0 ? (
+                <Link
+                  href={`/kittens/${kitten.id}/medical`}
+                  className="text-muted-foreground self-start text-xs underline underline-offset-2"
+                >
+                  Manage entries
+                </Link>
+              ) : null}
             </CardContent>
           </Card>
 

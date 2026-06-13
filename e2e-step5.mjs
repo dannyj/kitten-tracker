@@ -22,7 +22,9 @@ async function login(p, user, pass) {
 }
 async function href(name) {
   await page.goto(`${BASE}/kittens?status=all`);
-  return page.locator(`tr:has-text("${name}") a[href^="/kittens/"]`).first().getAttribute("href");
+  await page.locator(`tr:has-text("${name}") td`).last().click();
+  await page.waitForURL(/\/kittens\/\d+$/);
+  return new URL(page.url()).pathname;
 }
 const idOf = (h) => Number(h.split("/").pop());
 async function noOverflow() {
@@ -89,22 +91,29 @@ try {
   check("AC3: given history present (batch shown)", /FV-77/.test(muisMed));
 
   // ---- AC8: correction after window creates a new referencing entry ----
-  // Muis FVRCP is locked (created 5d ago) -> only a "Correct" button.
-  const fvrcpItem = page.locator("#medical li:has-text('FVRCP')").first();
+  // Edit/delete/correct moved to the manage view (rev 1, item 3). Detail medical
+  // is read-only; the locked FVRCP exposes "Correct" in the manage view.
+  check(
+    "AC8: detail medical is read-only (no inline controls)",
+    (await page.locator("#medical li button:has-text('Correct')").count()) === 0 &&
+      (await page.locator("#medical li button:has-text('Edit')").count()) === 0,
+  );
+  await page.goto(`${BASE}${muis}/medical`);
+  const fvrcpItem = page.locator("li:has-text('FVRCP')").first();
   check(
     "AC8: locked entry has no Edit, only Correct",
     (await fvrcpItem.locator("button:has-text('Edit')").count()) === 0 &&
       (await fvrcpItem.locator("button:has-text('Correct')").count()) === 1,
   );
   await fvrcpItem.locator("button:has-text('Correct')").click();
-  await page.waitForSelector("#medical form:has-text('Correcting the entry')");
+  await page.waitForSelector("form:has-text('Correcting the entry')");
   await page.fill(
-    "#medical form:has-text('Correcting the entry') input[name=batchNumber]",
+    "form:has-text('Correcting the entry') input[name=batchNumber]",
     "FV-77-CORRECTED",
   );
-  await page.click("#medical button:has-text('Save correction')");
-  await page.waitForSelector("#medical:has-text('Corrects entry of')");
-  const afterCorrection = await page.textContent("#medical");
+  await page.click("button:has-text('Save correction')");
+  await page.waitForFunction(() => document.body.textContent.includes("Corrects entry of"));
+  const afterCorrection = await page.textContent("body");
   check(
     "AC8: correction creates new entry referencing original",
     /Corrects entry of/.test(afterCorrection) &&

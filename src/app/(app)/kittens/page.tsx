@@ -1,18 +1,7 @@
 import { and, asc, eq, inArray, max, type SQL } from "drizzle-orm";
-import { Cat, Milk, Plus } from "lucide-react";
-import Image from "next/image";
+import { Cat, Plus } from "lucide-react";
 import Link from "next/link";
-import { AlertBadge } from "@/components/alert-badge";
-import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { db } from "@/db";
 import { kittens, KITTEN_STATUSES, statusHistory, type KittenStatus } from "@/db/schema";
 import { requireUser } from "@/lib/auth/guard";
@@ -22,6 +11,7 @@ import { getAlertSettings } from "@/lib/settings";
 import { ACTIVE_STATUSES } from "@/lib/status";
 import { alertsByKitten } from "@/lib/weight-data";
 import { FilterBar } from "./filter-bar";
+import { KittensTable, type KittenRowView } from "./kittens-table";
 import { litterOptionList } from "./litter-options";
 
 export const metadata = { title: "Kittens — Kitten Tracker" };
@@ -81,6 +71,22 @@ export default async function KittensPage({
     rows.map((k) => ({ id: k.id, coverPhotoId: k.coverPhotoId })),
   );
 
+  const rowViews: KittenRowView[] = rows.map((kitten) => ({
+    id: kitten.id,
+    name: kitten.name,
+    handFeeding: kitten.handFeeding,
+    coverPhotoId: covers.get(kitten.id) ?? null,
+    shelterNumber: kitten.shelterNumber,
+    sexLabel: SEX_LABELS[kitten.sex],
+    ageText:
+      formatAge(kitten.birthDate, {
+        estimated: kitten.birthDateEstimated,
+        until: deathDates.get(kitten.id),
+      }) ?? "—",
+    status: kitten.status,
+    alert: alerts.get(kitten.id) ?? null,
+  }));
+
   const litterOptions = litterOptionList();
 
   return (
@@ -112,71 +118,7 @@ export default async function KittensPage({
           </p>
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-lg border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead className="hidden sm:table-cell">Shelter #</TableHead>
-                <TableHead className="hidden sm:table-cell">Sex</TableHead>
-                <TableHead>Age</TableHead>
-                <TableHead>Status</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rows.map((kitten) => (
-                <TableRow key={kitten.id}>
-                  <TableCell>
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      {covers.get(kitten.id) ? (
-                        <Image
-                          src={`/api/photos/${covers.get(kitten.id)}?thumb=1`}
-                          alt=""
-                          width={28}
-                          height={28}
-                          unoptimized
-                          className="size-7 shrink-0 rounded-full object-cover"
-                        />
-                      ) : (
-                        <span className="bg-muted flex size-7 shrink-0 items-center justify-center rounded-full">
-                          <Cat className="text-muted-foreground size-3.5" aria-hidden />
-                        </span>
-                      )}
-                      <Link
-                        href={`/kittens/${kitten.id}`}
-                        className="flex items-center gap-1.5 font-medium hover:underline"
-                      >
-                        {kitten.name}
-                        {kitten.handFeeding ? (
-                          <Milk
-                            className="size-3.5 shrink-0 text-sky-600"
-                            aria-label="Hand-feeding"
-                          />
-                        ) : null}
-                      </Link>
-                      {alerts.has(kitten.id) ? (
-                        <AlertBadge result={alerts.get(kitten.id)!} />
-                      ) : null}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground hidden sm:table-cell">
-                    {kitten.shelterNumber ?? "—"}
-                  </TableCell>
-                  <TableCell className="hidden sm:table-cell">{SEX_LABELS[kitten.sex]}</TableCell>
-                  <TableCell>
-                    {formatAge(kitten.birthDate, {
-                      estimated: kitten.birthDateEstimated,
-                      until: deathDates.get(kitten.id),
-                    }) ?? "—"}
-                  </TableCell>
-                  <TableCell>
-                    <StatusBadge status={kitten.status} />
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+        <KittensTable rows={rowViews} />
       )}
     </div>
   );

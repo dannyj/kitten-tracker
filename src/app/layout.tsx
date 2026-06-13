@@ -1,15 +1,21 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Inter, Source_Serif_4 } from "next/font/google";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+// Self-hosted at build time by next/font (downloaded + served from our own
+// origin — no runtime hotlink to Google). Inter for UI/body, Source Serif 4
+// for an academic/editorial heading note. Swap to next/font/local if licensed
+// faces (e.g. Styrene/Tiempos) are ever supplied.
+const inter = Inter({
+  variable: "--font-sans",
   subsets: ["latin"],
+  display: "swap",
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const sourceSerif = Source_Serif_4({
+  variable: "--font-serif",
   subsets: ["latin"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -28,8 +34,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col">{children}</body>
+    <html lang="en" className={`${inter.variable} ${sourceSerif.variable} h-full antialiased`}>
+      <body className="flex min-h-full flex-col">{children}</body>
     </html>
   );
 }

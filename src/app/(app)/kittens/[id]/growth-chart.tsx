@@ -44,7 +44,9 @@ export function GrowthChart({ points }: { points: GrowthChartPoint[] }) {
           labelFormatter={(ms) => formatTick(Number(ms))}
           formatter={(value, name) => {
             if (name === "weight") return [`${value} g`, "Weight"];
-            return [value, name];
+            // The band series' value is a [low, high] tuple — show it as a range.
+            if (Array.isArray(value)) return [`${value[0]}–${value[1]} g`, "Expected range"];
+            return [`${value} g`, name];
           }}
         />
         {/* Expected-growth corridor as a range area between the band edges. */}

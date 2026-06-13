@@ -22,13 +22,11 @@ async function login(p, user, pass) {
 }
 
 async function kittenIdByName(name) {
-  // Find the kitten's detail link from the All-statuses list.
+  // Rows navigate via whole-row click (no inner <a>); click and read the URL.
   await page.goto(`${BASE}/kittens?status=all`);
-  const href = await page
-    .locator(`tr:has-text("${name}") a[href^="/kittens/"]`)
-    .first()
-    .getAttribute("href");
-  return href;
+  await page.locator(`tr:has-text("${name}") td`).last().click();
+  await page.waitForURL(/\/kittens\/\d+$/);
+  return new URL(page.url()).pathname;
 }
 
 async function noOverflow(p) {
@@ -54,18 +52,19 @@ try {
   await page.waitForSelector("li:has-text('150 g')");
   check("AC1: weight recorded and listed", true);
 
-  // edit-within-window then delete-within-window
+  // edit/delete moved to the dedicated manage view (rev 1, item 3).
+  await page.goto(`${BASE}${vlekHref}/weights`);
   await page.click("li:has-text('150 g') button:has-text('Edit')");
   await page.waitForSelector("li input[name=weightGrams]");
   await page.fill("li input[name=weightGrams]", "152");
   await page.click("li button:has-text('Save')");
   await page.waitForSelector("li:has-text('152 g')");
-  check("weight editable within window", true);
+  check("weight editable within window (manage view)", true);
 
   page.once("dialog", (d) => d.accept());
   await page.click("li:has-text('152 g') button:has-text('Delete')");
   await page.waitForFunction(() => !document.body.textContent.includes("152 g"));
-  check("weight deletable within window", true);
+  check("weight deletable within window (manage view)", true);
 
   // ---- AC1b: litter weigh-in flow ----
   // Litter B is the orphan overview litter (4 active kittens).

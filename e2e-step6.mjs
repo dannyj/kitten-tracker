@@ -51,11 +51,10 @@ try {
   await page.click("form button[type=submit]");
   await page.waitForURL(`${BASE}/`);
 
-  const muis = await page
-    .goto(`${BASE}/kittens?status=all`)
-    .then(() =>
-      page.locator(`tr:has-text("Muis") a[href^="/kittens/"]`).first().getAttribute("href"),
-    );
+  await page.goto(`${BASE}/kittens?status=all`);
+  await page.locator(`tr:has-text("Muis") td`).last().click();
+  await page.waitForURL(/\/kittens\/\d+$/);
+  const muis = new URL(page.url()).pathname;
   await page.goto(`${BASE}${muis}`);
   await page.waitForSelector("#photos");
 
