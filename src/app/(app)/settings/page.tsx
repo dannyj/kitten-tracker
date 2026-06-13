@@ -7,9 +7,23 @@ import { ScheduleTemplatesForm } from "./schedule-templates-form";
 export const metadata = { title: "Settings — Kitten Tracker" };
 
 export default async function SettingsPage() {
-  await requireUser();
+  const user = await requireUser();
   const settings = getAlertSettings();
   const templates = getScheduleTemplates();
+
+  if (user.role !== "admin") {
+    return (
+      <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
+        <h1 className="text-2xl font-semibold">Settings</h1>
+        <Card>
+          <CardContent className="text-muted-foreground p-6 text-sm">
+            Settings are admin-only. Ask an administrator to change alert thresholds or schedule
+            templates.
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">

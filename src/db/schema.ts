@@ -216,6 +216,16 @@ export const alertSettings = sqliteTable(
   (t) => [uniqueIndex("alert_settings_key_unique").on(t.key)],
 );
 
+// Durable security/audit trail: logins, adopter-PII access, exports.
+export const auditLog = sqliteTable("audit_log", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  at: integer("at", { mode: "timestamp" }).notNull().default(now),
+  action: text("action").notNull(),
+  username: text("username"),
+  ip: text("ip"),
+  detail: text("detail"),
+});
+
 export const users = sqliteTable(
   "users",
   {

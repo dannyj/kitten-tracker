@@ -1,12 +1,21 @@
-import { and, eq, inArray } from "drizzle-orm";
-import { Cat, Pill, UtensilsCrossed } from "lucide-react";
+import { inArray } from "drizzle-orm";
+import { Cat, Pill, TriangleAlert, UtensilsCrossed } from "lucide-react";
+import Image from "next/image";
+import Link from "next/link";
+import { AlertBadge } from "@/components/alert-badge";
+import { FeedCountdown } from "@/components/feed-countdown";
+import { StatusBadge } from "@/components/status-badge";
+import { Card, CardContent } from "@/components/ui/card";
 import { db } from "@/db";
 import { feedings, kittens } from "@/db/schema";
+import { TREND_ARROW } from "@/lib/alerts";
 import { requireUser } from "@/lib/auth/guard";
-import { todayIso } from "@/lib/dates";
+import { formatAge, todayIso } from "@/lib/dates";
 import { medicalDueByKitten } from "@/lib/medical-data";
-import { getScheduleTemplates } from "@/lib/settings";
+import { coverPhotoIdByKitten } from "@/lib/photo-data";
+import { getAlertSettings, getScheduleTemplates } from "@/lib/settings";
 import { ACTIVE_STATUSES } from "@/lib/status";
+import { alertsByKitten, weightPointsByKitten } from "@/lib/weight-data";
 import { DashboardFeeding, type FeedingDueRow } from "./dashboard-feeding";
 import { DashboardMedical, type MedicalDueRow } from "./dashboard-medical";
 
@@ -17,48 +26,53 @@ export default async function DashboardPage() {
 
   const totalKittens = db.select({ id: kittens.id }).from(kittens).all().length;
 
-  const handFed = db
-    .select({ id: kittens.id, name: kittens.name, intervalMinutes: kittens.feedingIntervalMinutes })
+  const activeKittens = db
+    .select()
     .from(kittens)
-    .where(and(eq(kittens.handFeeding, true), inArray(kittens.status, ACTIVE_STATUSES)))
+    .where(inArray(kittens.status, ACTIVE_STATUSES))
+    .orderBy(kittens.name)
     .all();
+  const ids = activeKittens.map((k) => k.id);
 
-  // Last feed per hand-fed kitten (one query, grouped client-side).
+  const settings = getAlertSettings();
+  const alerts = alertsByKitten(ids, settings);
+  const weightPoints = weightPointsByKitten(ids);
+  const covers = coverPhotoIdByKitten(
+    activeKittens.map((k) => ({ id: k.id, coverPhotoId: k.coverPhotoId })),
+  );
+
+  // Last feed per active hand-fed kitten.
+  const handFedIds = activeKittens.filter((k) => k.handFeeding).map((k) => k.id);
   const lastFedByKitten = new Map<number, number>();
-  if (handFed.length > 0) {
-    const rows = db
+  if (handFedIds.length > 0) {
+    for (const r of db
       .select({ kittenId: feedings.kittenId, fedAt: feedings.fedAt })
       .from(feedings)
-      .where(
-        inArray(
-          feedings.kittenId,
-          handFed.map((k) => k.id),
-        ),
-      )
-      .all();
-    for (const r of rows) {
+      .where(inArray(feedings.kittenId, handFedIds))
+      .all()) {
       const ms = r.fedAt.getTime();
       const prev = lastFedByKitten.get(r.kittenId);
       if (prev === undefined || ms > prev) lastFedByKitten.set(r.kittenId, ms);
     }
   }
 
-  const feedingRows: FeedingDueRow[] = handFed.map((k) => ({
-    id: k.id,
-    name: k.name,
-    intervalMinutes: k.intervalMinutes,
-    lastFedMs: lastFedByKitten.get(k.id) ?? null,
-  }));
+  const feedingRows: FeedingDueRow[] = activeKittens
+    .filter((k) => k.handFeeding)
+    .map((k) => ({
+      id: k.id,
+      name: k.name,
+      intervalMinutes: k.feedingIntervalMinutes,
+      lastFedMs: lastFedByKitten.get(k.id) ?? null,
+    }));
 
-  // Medical-due panel: active kittens with vaccinations overdue or due ≤7 days.
-  const activeKittens = db
-    .select({ id: kittens.id, name: kittens.name, birthDate: kittens.birthDate })
-    .from(kittens)
-    .where(inArray(kittens.status, ACTIVE_STATUSES))
-    .all();
+  // Medical-due: active kittens with vaccinations overdue or due ≤7 days.
   const templates = getScheduleTemplates();
   const today = todayIso();
-  const dueByKitten = medicalDueByKitten(activeKittens, templates, today);
+  const dueByKitten = medicalDueByKitten(
+    activeKittens.map((k) => ({ id: k.id, birthDate: k.birthDate })),
+    templates,
+    today,
+  );
   const medicalRows: MedicalDueRow[] = activeKittens.flatMap((k) =>
     (dueByKitten.get(k.id) ?? []).map((item) => ({
       kittenId: k.id,
@@ -70,37 +84,145 @@ export default async function DashboardPage() {
     })),
   );
 
-  return (
-    <div className="mx-auto flex w-full max-w-4xl flex-col gap-6">
-      <h1 className="text-2xl font-semibold">Dashboard</h1>
+  // Alert center: flagged (urgent first), then warnings.
+  const flagged = activeKittens
+    .map((k) => ({ kitten: k, alert: alerts.get(k.id)! }))
+    .filter(({ alert }) => alert.level === "urgent" || alert.level === "warning")
+    .sort((a, b) => (a.alert.level === "urgent" ? 0 : 1) - (b.alert.level === "urgent" ? 0 : 1));
 
-      {totalKittens === 0 ? (
+  if (totalKittens === 0) {
+    return (
+      <div className="mx-auto flex w-full max-w-4xl flex-col gap-6">
+        <h1 className="text-2xl font-semibold">Dashboard</h1>
         <div className="flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed py-20 text-center">
           <div className="bg-muted flex size-14 items-center justify-center rounded-full">
             <Cat className="text-muted-foreground size-7" aria-hidden />
           </div>
           <p className="font-medium">No kittens yet</p>
           <p className="text-muted-foreground max-w-xs text-sm">
-            Once kittens are added, their weights, feeding countdowns and alerts will show up here.
+            Add a mother and her litter to get started — weights, feeding countdowns and alerts will
+            show up here.
           </p>
+          <Link href="/mothers/new" className="text-sm underline underline-offset-2">
+            Add a mother
+          </Link>
         </div>
-      ) : (
-        <div className="flex flex-col gap-6">
-          <section className="flex flex-col gap-3">
-            <h2 className="flex items-center gap-2 text-lg font-medium">
-              <UtensilsCrossed className="size-5" aria-hidden /> Feeding due
-            </h2>
-            <DashboardFeeding rows={feedingRows} />
-          </section>
+      </div>
+    );
+  }
 
-          <section className="flex flex-col gap-3">
-            <h2 className="flex items-center gap-2 text-lg font-medium">
-              <Pill className="size-5" aria-hidden /> Medical due
-            </h2>
-            <DashboardMedical rows={medicalRows} templates={templates} todayIso={today} />
-          </section>
-        </div>
-      )}
+  return (
+    <div className="mx-auto flex w-full max-w-4xl flex-col gap-6">
+      <h1 className="text-2xl font-semibold">Dashboard</h1>
+
+      {flagged.length > 0 ? (
+        <section className="flex flex-col gap-3">
+          <h2 className="flex items-center gap-2 text-lg font-medium">
+            <TriangleAlert className="size-5" aria-hidden /> Needs attention
+          </h2>
+          <div className="flex flex-col gap-2">
+            {flagged.map(({ kitten, alert }) => (
+              <Link key={kitten.id} href={`/kittens/${kitten.id}`} className="group">
+                <Card
+                  className={
+                    alert.level === "urgent"
+                      ? "border-red-200 bg-red-50 transition-colors"
+                      : "border-amber-200 bg-amber-50 transition-colors"
+                  }
+                >
+                  <CardContent className="flex flex-col gap-1 p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-medium">{kitten.name}</span>
+                      <AlertBadge result={alert} />
+                    </div>
+                    <p className="text-sm">{alert.reasons[0]}</p>
+                  </CardContent>
+                </Card>
+              </Link>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {feedingRows.length > 0 ? (
+        <section className="flex flex-col gap-3">
+          <h2 className="flex items-center gap-2 text-lg font-medium">
+            <UtensilsCrossed className="size-5" aria-hidden /> Feeding due
+          </h2>
+          <DashboardFeeding rows={feedingRows} />
+        </section>
+      ) : null}
+
+      <section className="flex flex-col gap-3">
+        <h2 className="flex items-center gap-2 text-lg font-medium">
+          <Pill className="size-5" aria-hidden /> Medical due
+        </h2>
+        <DashboardMedical rows={medicalRows} templates={templates} todayIso={today} />
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <h2 className="flex items-center gap-2 text-lg font-medium">
+          <Cat className="size-5" aria-hidden /> Active kittens
+        </h2>
+        {activeKittens.length === 0 ? (
+          <p className="text-muted-foreground rounded-lg border border-dashed p-4 text-sm">
+            No active kittens right now.
+          </p>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2">
+            {activeKittens.map((kitten) => {
+              const points = weightPoints.get(kitten.id) ?? [];
+              const last = points.at(-1);
+              const alert = alerts.get(kitten.id);
+              const coverId = covers.get(kitten.id);
+              return (
+                <Link key={kitten.id} href={`/kittens/${kitten.id}`} className="group">
+                  <Card className="group-hover:border-primary/50 h-full transition-colors">
+                    <CardContent className="flex items-center gap-3 p-3">
+                      {coverId ? (
+                        <Image
+                          src={`/api/photos/${coverId}?thumb=1`}
+                          alt=""
+                          width={56}
+                          height={56}
+                          unoptimized
+                          className="size-14 shrink-0 rounded-md object-cover"
+                        />
+                      ) : (
+                        <span className="bg-muted flex size-14 shrink-0 items-center justify-center rounded-md">
+                          <Cat className="text-muted-foreground size-6" aria-hidden />
+                        </span>
+                      )}
+                      <div className="flex min-w-0 flex-col gap-0.5">
+                        <div className="flex items-center gap-1.5">
+                          <span className="truncate font-medium">{kitten.name}</span>
+                          <StatusBadge status={kitten.status} />
+                        </div>
+                        <p className="text-muted-foreground text-xs">
+                          {formatAge(kitten.birthDate, { estimated: kitten.birthDateEstimated }) ??
+                            "age unknown"}
+                          {last
+                            ? ` · ${last.weightGrams} g${alert?.trend ? ` ${TREND_ARROW[alert.trend]}` : ""}`
+                            : " · no weight"}
+                        </p>
+                        <div className="flex flex-wrap items-center gap-2">
+                          {alert ? <AlertBadge result={alert} /> : null}
+                          {kitten.handFeeding ? (
+                            <FeedCountdown
+                              lastFedMs={lastFedByKitten.get(kitten.id) ?? null}
+                              intervalMinutes={kitten.feedingIntervalMinutes}
+                            />
+                          ) : null}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </Link>
+              );
+            })}
+          </div>
+        )}
+      </section>
     </div>
   );
 }

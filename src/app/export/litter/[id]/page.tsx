@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { z } from "zod";
+import { audit } from "@/lib/audit";
 import { requireUser } from "@/lib/auth/guard";
 import { todayIso } from "@/lib/dates";
 import { getLitterExport } from "@/lib/export-data";
@@ -27,10 +28,15 @@ export default async function LitterExportPage({
   const data = getLitterExport(idParse.data, includesAdopter);
   if (!data) notFound();
 
+  audit("export.litter", {
+    username: user.username,
+    detail: `id=${data.litterId} print adopter=${includesAdopter}`,
+  });
   if (includesAdopter) {
-    console.warn(
-      `[audit] adopter PII included in litter export id=${data.litterId} by ${user.username}`,
-    );
+    audit("adopter_pii.access", {
+      username: user.username,
+      detail: `litter export id=${data.litterId}`,
+    });
   }
 
   return (

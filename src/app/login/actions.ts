@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db } from "@/db";
 import { users } from "@/db/schema";
+import { audit } from "@/lib/audit";
 import { getDummyPasswordHash, verifyPassword } from "@/lib/auth/password";
 import { consumeLoginAttempt, resetLoginAttempts } from "@/lib/auth/rate-limit";
 import { createSession, generateSessionToken, setSessionCookie } from "@/lib/auth/session";
@@ -34,11 +35,13 @@ export async function login(_prev: LoginState, formData: FormData): Promise<Logi
   }
 
   const ip = await clientIp();
+  const { username, password } = parsed.data;
+
   if (!consumeLoginAttempt(ip)) {
+    audit("login.rate_limited", { username, ip });
     return { error: "Too many attempts. Try again in 15 minutes." };
   }
 
-  const { username, password } = parsed.data;
   const user = db.select().from(users).where(eq(users.username, username)).get();
 
   let validPassword = false;
@@ -50,10 +53,12 @@ export async function login(_prev: LoginState, formData: FormData): Promise<Logi
   }
 
   if (!user || !validPassword) {
+    audit("login.failure", { username, ip });
     return { error: "Invalid username or password." };
   }
 
   resetLoginAttempts(ip);
+  audit("login.success", { username: user.username, ip });
   const token = generateSessionToken();
   const session = createSession(token, user.id);
   await setSessionCookie(token, session.expiresAt);

@@ -42,7 +42,9 @@ fs.mkdirSync(DIR, { recursive: true });
   const tmpJpg = `${DIR}/_src.jpg`;
   fs.writeFileSync(
     tmpJpg,
-    await sharp({ create: { width: 200, height: 200, channels: 3, background: { r: 150, g: 90, b: 180 } } })
+    await sharp({
+      create: { width: 200, height: 200, channels: 3, background: { r: 150, g: 90, b: 180 } },
+    })
       .jpeg()
       .toBuffer(),
   );

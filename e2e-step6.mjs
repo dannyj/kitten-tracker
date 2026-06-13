@@ -31,7 +31,12 @@ function fetchBytes(p, url) {
     const b = new Uint8Array(await r.arrayBuffer());
     let bin = "";
     for (const x of b) bin += String.fromCharCode(x);
-    return { status: r.status, ct: r.headers.get("content-type") || "", b64: btoa(bin), len: b.length };
+    return {
+      status: r.status,
+      ct: r.headers.get("content-type") || "",
+      b64: btoa(bin),
+      len: b.length,
+    };
   }, url);
 }
 async function lastThumbId() {
@@ -68,7 +73,9 @@ try {
   const exifPhotoId = await lastThumbId();
   const served = await fetchBytes(page, `${BASE}/api/photos/${exifPhotoId}`);
   const bytes = Buffer.from(served.b64, "base64");
-  const isWebp = bytes.slice(0, 4).toString("latin1") === "RIFF" && bytes.slice(8, 12).toString("latin1") === "WEBP";
+  const isWebp =
+    bytes.slice(0, 4).toString("latin1") === "RIFF" &&
+    bytes.slice(8, 12).toString("latin1") === "WEBP";
   const reExif = await exifr.parse(bytes).catch(() => null);
   check("AC3: served image is webp", served.ct === "image/webp" && isWebp, served.ct);
   check(
@@ -137,7 +144,11 @@ try {
   await waitCount(5); // +2 succeeded, fake failed
   const added = await page.locator("#photos li:has-text('Added')").count();
   const failed = await page.locator("#photos li:has-text('Failed')").count();
-  check("AC8: batch upload independent (2 ok, 1 failed)", added === 2 && failed === 1, `added ${added}, failed ${failed}`);
+  check(
+    "AC8: batch upload independent (2 ok, 1 failed)",
+    added === 2 && failed === 1,
+    `added ${added}, failed ${failed}`,
+  );
 
   // ---- AC6: cover photo reflects in list ----
   await gridItems().first().click();
@@ -146,13 +157,20 @@ try {
   await page.waitForTimeout(800);
   const coverId = exifPhotoId;
   await page.goto(`${BASE}/kittens?status=all`);
-  const rowImg = await page.locator(`tr:has-text("Muis") img[src*="/api/photos/"]`).first().getAttribute("src");
+  const rowImg = await page
+    .locator(`tr:has-text("Muis") img[src*="/api/photos/"]`)
+    .first()
+    .getAttribute("src");
   check("AC6: cover photo shows in kitten list", rowImg.includes(`/api/photos/${coverId}`), rowImg);
 
   // ---- AC4: auth required, unknown -> 404, traversal blocked ----
   const anon = await browser.newContext();
   const anonReq = await anon.request.get(`${BASE}/api/photos/${coverId}`);
-  check("AC4: image requires a session (401 without cookie)", anonReq.status() === 401, `status ${anonReq.status()}`);
+  check(
+    "AC4: image requires a session (401 without cookie)",
+    anonReq.status() === 401,
+    `status ${anonReq.status()}`,
+  );
   await anon.close();
   const unknown = await fetchBytes(page, `${BASE}/api/photos/999999`);
   check("AC4: unknown id -> 404", unknown.status === 404);
@@ -188,7 +206,10 @@ try {
   await page.waitForSelector("text=Add photos");
   await page.locator("input[type=file]").first().setInputFiles(`${FX}/batch-a.jpg`);
   await page.waitForSelector("[data-testid=photo-grid] > li");
-  check("mother gallery accepts photos (date only)", (await page.locator("[data-testid=photo-grid] > li").count()) >= 1);
+  check(
+    "mother gallery accepts photos (date only)",
+    (await page.locator("[data-testid=photo-grid] > li").count()) >= 1,
+  );
 } catch (err) {
   check("script completed", false, String(err).split("\n")[0]);
   await page.screenshot({ path: "/tmp/kitten_e2e6_failure.png", fullPage: true }).catch(() => {});

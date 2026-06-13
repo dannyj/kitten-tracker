@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { z } from "zod";
+import { audit } from "@/lib/audit";
 import { requireUser } from "@/lib/auth/guard";
 import { todayIso } from "@/lib/dates";
 import { getKittenExport } from "@/lib/export-data";
@@ -27,8 +28,12 @@ export default async function KittenExportPage({
   const data = getKittenExport(idParse.data, includesAdopter);
   if (!data) notFound();
 
+  audit("export.kitten", {
+    username: user.username,
+    detail: `id=${data.id} print adopter=${includesAdopter}`,
+  });
   if (includesAdopter) {
-    console.warn(`[audit] adopter PII included in kitten export id=${data.id} by ${user.username}`);
+    audit("adopter_pii.access", { username: user.username, detail: `kitten export id=${data.id}` });
   }
 
   return (

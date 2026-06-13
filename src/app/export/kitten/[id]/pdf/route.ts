@@ -1,4 +1,5 @@
 import { type NextRequest } from "next/server";
+import { audit } from "@/lib/audit";
 import { getCurrentSession } from "@/lib/auth/session";
 import { todayIso } from "@/lib/dates";
 import { getKittenExport } from "@/lib/export-data";
@@ -18,8 +19,12 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const data = getKittenExport(id, includesAdopter);
   if (!data) return new Response("Not found", { status: 404 });
 
+  audit("export.kitten", {
+    username: user.username,
+    detail: `id=${id} pdf adopter=${includesAdopter}`,
+  });
   if (includesAdopter) {
-    console.warn(`[audit] adopter PII included in kitten PDF id=${id} by ${user.username}`);
+    audit("adopter_pii.access", { username: user.username, detail: `kitten pdf id=${id}` });
   }
 
   const pdf = await kittenPdf(data, {

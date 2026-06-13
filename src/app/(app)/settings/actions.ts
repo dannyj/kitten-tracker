@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/db";
 import { alertSettings, scheduleTemplates } from "@/db/schema";
-import { requireUser } from "@/lib/auth/guard";
+import { requireAdmin } from "@/lib/auth/guard";
 import { DEFAULT_ALERT_SETTINGS } from "@/lib/alerts";
 import type { FormState } from "@/lib/forms";
 import { DEFAULT_SCHEDULE_TEMPLATES, type ScheduleTemplate } from "@/lib/schedule";
@@ -35,7 +35,7 @@ function persist(values: z.infer<typeof alertSettingsSchema>) {
 }
 
 export async function saveAlertSettings(_prev: FormState, formData: FormData): Promise<FormState> {
-  await requireUser();
+  await requireAdmin();
   const parsed = alertSettingsSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) {
     return { error: parsed.error.issues[0].message };
@@ -48,7 +48,7 @@ export async function saveAlertSettings(_prev: FormState, formData: FormData): P
 }
 
 export async function resetAlertSettings(): Promise<void> {
-  await requireUser();
+  await requireAdmin();
   persist(DEFAULT_ALERT_SETTINGS);
 }
 
@@ -70,7 +70,7 @@ export async function saveScheduleTemplates(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  await requireUser();
+  await requireAdmin();
   const existing = db
     .select({ vaccineType: scheduleTemplates.vaccineType })
     .from(scheduleTemplates)
@@ -103,7 +103,7 @@ export async function saveScheduleTemplates(
 }
 
 export async function resetScheduleTemplates(): Promise<void> {
-  await requireUser();
+  await requireAdmin();
   db.transaction((tx) => {
     for (const tpl of DEFAULT_SCHEDULE_TEMPLATES as ScheduleTemplate[]) {
       tx.update(scheduleTemplates)
