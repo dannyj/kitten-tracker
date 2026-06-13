@@ -1,6 +1,14 @@
 "use client";
 
-import { Cat, Heart, LayoutDashboard, Settings, Users, type LucideIcon } from "lucide-react";
+import {
+  Cat,
+  Heart,
+  LayoutDashboard,
+  Settings,
+  TriangleAlert,
+  Users,
+  type LucideIcon,
+} from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -9,6 +17,7 @@ type NavItem = { href: string; label: string; icon: LucideIcon };
 
 export const NAV_ITEMS: NavItem[] = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/alerts", label: "Alerts", icon: TriangleAlert },
   { href: "/kittens", label: "Kittens", icon: Cat },
   { href: "/mothers", label: "Mothers", icon: Heart },
   { href: "/viewings", label: "Viewings", icon: Users },

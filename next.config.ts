@@ -14,7 +14,12 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   output: "standalone",
-  serverExternalPackages: ["better-sqlite3", "@node-rs/argon2"],
+  serverExternalPackages: ["better-sqlite3", "@node-rs/argon2", "pdfkit"],
+  // pdfkit reads its standard-font AFM metrics from disk at runtime; make sure
+  // the standalone trace ships them for the export routes.
+  outputFileTracingIncludes: {
+    "/export/**": ["./node_modules/pdfkit/js/data/*.afm"],
+  },
   async headers() {
     return [
       {

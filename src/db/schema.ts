@@ -1,5 +1,13 @@
 import { sql } from "drizzle-orm";
-import { integer, primaryKey, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import {
+  type AnySQLiteColumn,
+  integer,
+  primaryKey,
+  real,
+  sqliteTable,
+  text,
+  uniqueIndex,
+} from "drizzle-orm/sqlite-core";
 
 export const KITTEN_STATUSES = [
   "intake",
@@ -80,6 +88,10 @@ export const weightEntries = sqliteTable("weight_entries", {
   weighedAt: integer("weighed_at", { mode: "timestamp" }).notNull().default(now),
   weightGrams: integer("weight_grams").notNull(),
   note: text("note"),
+  // Creation time, distinct from weighedAt (which may be backdated). The
+  // 15-minute edit/delete window runs from this so backdated entries are
+  // still correctable right after entry.
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull().default(now),
 });
 
 export const feedings = sqliteTable("feedings", {
@@ -92,6 +104,9 @@ export const feedings = sqliteTable("feedings", {
   formula: text("formula"),
   quality: text("quality", { enum: FEEDING_QUALITIES }),
   note: text("note"),
+  // Creation time, distinct from fedAt (which may be backdated). The 15-minute
+  // edit/delete window runs from this. Mirrors weight_entries.created_at.
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull().default(now),
 });
 
 export const vaccinations = sqliteTable("vaccinations", {
@@ -105,7 +120,27 @@ export const vaccinations = sqliteTable("vaccinations", {
   administeredBy: text("administered_by"),
   nextDueDate: text("next_due_date"),
   note: text("note"),
+  // Medical records are append-only: after the 15-minute edit window a
+  // correction becomes a NEW row pointing at the original via correctsId,
+  // never a silent edit. createdAt drives that window (givenAt is backdatable).
+  correctsId: integer("corrects_id").references((): AnySQLiteColumn => vaccinations.id),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull().default(now),
 });
+
+// Vaccination/deworming schedule templates — convenience defaults (NOT a
+// veterinary protocol), editable in Settings. Seeded in migrate.ts.
+export const scheduleTemplates = sqliteTable(
+  "schedule_templates",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    vaccineType: text("vaccine_type").notNull(),
+    label: text("label").notNull(),
+    firstWeeks: real("first_weeks").notNull(),
+    everyWeeks: real("every_weeks").notNull(),
+    untilWeeks: real("until_weeks").notNull(),
+  },
+  (t) => [uniqueIndex("schedule_templates_type_unique").on(t.vaccineType)],
+);
 
 export const photos = sqliteTable("photos", {
   id: integer("id").primaryKey({ autoIncrement: true }),

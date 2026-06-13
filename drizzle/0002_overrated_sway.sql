@@ -1,0 +1,1 @@
+ALTER TABLE `feedings` ADD `created_at` integer DEFAULT (unixepoch()) NOT NULL;

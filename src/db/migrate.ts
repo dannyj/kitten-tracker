@@ -1,7 +1,8 @@
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import path from "node:path";
+import { DEFAULT_SCHEDULE_TEMPLATES } from "@/lib/schedule";
 import { db } from "./index";
-import { alertSettings } from "./schema";
+import { alertSettings, scheduleTemplates } from "./schema";
 
 const ALERT_SETTING_DEFAULTS: Record<string, string> = {
   min_daily_gain_g: "7",
@@ -20,5 +21,9 @@ export function migrateAndSeed() {
 
   for (const [key, value] of Object.entries(ALERT_SETTING_DEFAULTS)) {
     db.insert(alertSettings).values({ key, value }).onConflictDoNothing().run();
+  }
+
+  for (const tpl of DEFAULT_SCHEDULE_TEMPLATES) {
+    db.insert(scheduleTemplates).values(tpl).onConflictDoNothing().run();
   }
 }

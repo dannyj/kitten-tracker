@@ -19,6 +19,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Tests run via Node's type stripping and import with .ts extensions.
+    "**/*.test.ts",
+    "e2e-*.mjs",
+    "seed-*.cjs",
   ]),
 ]);
 

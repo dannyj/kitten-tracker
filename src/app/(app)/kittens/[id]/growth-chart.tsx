@@ -1,0 +1,74 @@
+"use client";
+
+import {
+  Area,
+  CartesianGrid,
+  ComposedChart,
+  Line,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
+import type { GrowthChartPoint } from "@/lib/growth";
+
+function formatTick(ms: number): string {
+  const d = new Date(ms);
+  return `${String(d.getDate()).padStart(2, "0")}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+export function GrowthChart({ points }: { points: GrowthChartPoint[] }) {
+  if (points.length < 2) {
+    return (
+      <div className="text-muted-foreground flex h-[240px] items-center justify-center rounded-lg border border-dashed text-sm">
+        Need at least two weighings to chart growth.
+      </div>
+    );
+  }
+
+  return (
+    <ResponsiveContainer width="100%" height={240}>
+      <ComposedChart data={points} margin={{ top: 8, right: 8, bottom: 0, left: -16 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+        <XAxis
+          dataKey="t"
+          type="number"
+          scale="time"
+          domain={["dataMin", "dataMax"]}
+          tickFormatter={formatTick}
+          fontSize={11}
+          minTickGap={24}
+        />
+        <YAxis fontSize={11} width={44} unit="g" domain={["auto", "auto"]} />
+        <Tooltip
+          labelFormatter={(ms) => formatTick(Number(ms))}
+          formatter={(value, name) => {
+            if (name === "weight") return [`${value} g`, "Weight"];
+            return [value, name];
+          }}
+        />
+        {/* Expected-growth corridor as a range area between the band edges. */}
+        <Area
+          dataKey={(d: GrowthChartPoint) =>
+            d.bandLow !== null && d.bandHigh !== null ? [d.bandLow, d.bandHigh] : undefined
+          }
+          stroke="none"
+          fill="#16a34a"
+          fillOpacity={0.1}
+          isAnimationActive={false}
+          activeDot={false}
+          legendType="none"
+          name="Expected range"
+        />
+        <Line
+          dataKey="weight"
+          stroke="#2563eb"
+          strokeWidth={2}
+          dot={{ r: 3 }}
+          isAnimationActive={false}
+          name="weight"
+        />
+      </ComposedChart>
+    </ResponsiveContainer>
+  );
+}

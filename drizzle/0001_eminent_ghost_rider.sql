@@ -1,0 +1,1 @@
+ALTER TABLE `weight_entries` ADD `created_at` integer DEFAULT (unixepoch()) NOT NULL;
