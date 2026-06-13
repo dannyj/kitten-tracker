@@ -1,5 +1,6 @@
 import { and, asc, eq, inArray, max, type SQL } from "drizzle-orm";
 import { Cat, Milk, Plus } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { AlertBadge } from "@/components/alert-badge";
 import { StatusBadge } from "@/components/status-badge";
@@ -16,6 +17,7 @@ import { db } from "@/db";
 import { kittens, KITTEN_STATUSES, statusHistory, type KittenStatus } from "@/db/schema";
 import { requireUser } from "@/lib/auth/guard";
 import { formatAge } from "@/lib/dates";
+import { coverPhotoIdByKitten } from "@/lib/photo-data";
 import { getAlertSettings } from "@/lib/settings";
 import { ACTIVE_STATUSES } from "@/lib/status";
 import { alertsByKitten } from "@/lib/weight-data";
@@ -75,6 +77,10 @@ export default async function KittensPage({
     .map((k) => k.id);
   const alerts = alertsByKitten(activeIds, getAlertSettings());
 
+  const covers = coverPhotoIdByKitten(
+    rows.map((k) => ({ id: k.id, coverPhotoId: k.coverPhotoId })),
+  );
+
   const litterOptions = litterOptionList();
 
   return (
@@ -122,6 +128,20 @@ export default async function KittensPage({
                 <TableRow key={kitten.id}>
                   <TableCell>
                     <div className="flex flex-wrap items-center gap-1.5">
+                      {covers.get(kitten.id) ? (
+                        <Image
+                          src={`/api/photos/${covers.get(kitten.id)}?thumb=1`}
+                          alt=""
+                          width={28}
+                          height={28}
+                          unoptimized
+                          className="size-7 shrink-0 rounded-full object-cover"
+                        />
+                      ) : (
+                        <span className="bg-muted flex size-7 shrink-0 items-center justify-center rounded-full">
+                          <Cat className="text-muted-foreground size-3.5" aria-hidden />
+                        </span>
+                      )}
                       <Link
                         href={`/kittens/${kitten.id}`}
                         className="flex items-center gap-1.5 font-medium hover:underline"

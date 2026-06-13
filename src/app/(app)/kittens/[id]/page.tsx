@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { z } from "zod";
 import { AlertBanner } from "@/components/alert-banner";
 import { HintsPanel } from "@/components/hints-panel";
+import { PhotoGallery } from "@/components/photo-gallery";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,6 +24,7 @@ import { evaluateAlert, TREND_ARROW } from "@/lib/alerts";
 import { requireUser } from "@/lib/auth/guard";
 import { formatAge, formatDate, formatDateTime, todayIso } from "@/lib/dates";
 import { buildKittenGrowthSeries } from "@/lib/growth";
+import { getSubjectPhotos } from "@/lib/photo-data";
 import { nextDueAll } from "@/lib/schedule";
 import { getAlertSettings, getScheduleTemplates } from "@/lib/settings";
 import { ACTIVE_STATUSES, STATUS_LABELS } from "@/lib/status";
@@ -33,21 +35,6 @@ import { StatusControl } from "./status-control";
 import { WeightsCard, type WeightRow } from "./weights-card";
 
 const SEX_LABELS = { male: "Male", female: "Female", unknown: "Unknown" } as const;
-
-function ComingSoon({ icon: Icon, title }: { icon: typeof Scale; title: string }) {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">{title}</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="text-muted-foreground flex items-center gap-2 rounded-lg border border-dashed p-4 text-sm">
-          <Icon className="size-4" aria-hidden /> Coming soon
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
 
 export default async function KittenDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const user = await requireUser();
@@ -138,6 +125,7 @@ export default async function KittenDetailPage({ params }: { params: Promise<{ i
     correctsOfDateIso: v.correctsId ? (givenAtById.get(v.correctsId) ?? null) : null,
     createdAtMs: v.createdAt.getTime(),
   }));
+  const kittenPhotos = getSubjectPhotos("kitten", kitten.id);
   const scheduleTemplatesList = getScheduleTemplates();
   // Count administered events (originals only, not corrections) per type.
   const givenCountByType: Record<string, number> = {};
@@ -410,7 +398,22 @@ export default async function KittenDetailPage({ params }: { params: Promise<{ i
           </Card>
 
           {/* Structure is final now; this fills in during step 6 */}
-          <ComingSoon icon={Camera} title="Photos" />
+          <Card id="photos" className="scroll-mt-20">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Camera className="size-4" aria-hidden /> Photos
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <PhotoGallery
+                subjectType="kitten"
+                subjectId={kitten.id}
+                birthDateIso={kitten.birthDate}
+                coverPhotoId={kitten.coverPhotoId}
+                photos={kittenPhotos}
+              />
+            </CardContent>
+          </Card>
         </div>
       </div>
     </div>

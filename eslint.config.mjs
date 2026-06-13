@@ -23,6 +23,7 @@ const eslintConfig = defineConfig([
     "**/*.test.ts",
     "e2e-*.mjs",
     "seed-*.cjs",
+    "make-*.cjs",
   ]),
 ]);
 

@@ -75,6 +75,11 @@ export const kittens = sqliteTable(
     handFeeding: integer("hand_feeding", { mode: "boolean" }).notNull().default(false),
     feedingIntervalMinutes: integer("feeding_interval_minutes").notNull().default(120),
     status: text("status", { enum: KITTEN_STATUSES }).notNull().default("intake"),
+    // Chosen cover photo; nulled automatically if that photo is deleted.
+    // Falls back to the most recent photo when unset.
+    coverPhotoId: integer("cover_photo_id").references((): AnySQLiteColumn => photos.id, {
+      onDelete: "set null",
+    }),
     createdAt: integer("created_at", { mode: "timestamp" }).notNull().default(now),
   },
   (t) => [uniqueIndex("kittens_shelter_number_unique").on(t.shelterNumber)],

@@ -1,0 +1,1 @@
+ALTER TABLE `kittens` ADD `cover_photo_id` integer REFERENCES photos(id);

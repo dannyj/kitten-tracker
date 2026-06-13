@@ -4,6 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { z } from "zod";
 import { AlertBadge } from "@/components/alert-badge";
+import { PhotoGallery } from "@/components/photo-gallery";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,6 +12,7 @@ import { db } from "@/db";
 import { kittens, litters, motherHealthLogs, mothers } from "@/db/schema";
 import { requireUser } from "@/lib/auth/guard";
 import { formatAge, formatDate } from "@/lib/dates";
+import { getSubjectPhotos } from "@/lib/photo-data";
 import { getAlertSettings } from "@/lib/settings";
 import { ACTIVE_STATUSES } from "@/lib/status";
 import { alertsByKitten } from "@/lib/weight-data";
@@ -57,6 +59,7 @@ export default async function MotherDetailPage({ params }: { params: Promise<{ i
     .filter((k) => (ACTIVE_STATUSES as string[]).includes(k.status))
     .map((k) => k.id);
   const kittenAlerts = alertsByKitten(activeKittenIds, getAlertSettings());
+  const motherPhotos = getSubjectPhotos("mother", mother.id);
   const logs = db
     .select()
     .from(motherHealthLogs)
@@ -97,9 +100,11 @@ export default async function MotherDetailPage({ params }: { params: Promise<{ i
                   {mother.notesBehaviour || "No notes yet."}
                 </p>
               </div>
-              {/* Photo slot — uploads arrive in step 6 */}
-              <div className="text-muted-foreground flex items-center gap-2 rounded-lg border border-dashed p-4 text-sm">
-                <Camera className="size-4" aria-hidden /> Photos coming soon
+              <div>
+                <p className="text-muted-foreground mb-2 flex items-center gap-1.5 text-xs font-medium uppercase">
+                  <Camera className="size-3.5" aria-hidden /> Photos
+                </p>
+                <PhotoGallery subjectType="mother" subjectId={mother.id} photos={motherPhotos} />
               </div>
             </CardContent>
           </Card>
