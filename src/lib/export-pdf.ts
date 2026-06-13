@@ -50,7 +50,8 @@ function kittenSection(doc: PDFKit.PDFDocument, k: KittenExport, meta: ExportMet
     labelValue(
       doc,
       "Weight",
-      `${g.birthWeightG} g (${formatDate(g.birthWeighedAtIso)}) → ${g.latestWeightG} g (${formatDate(g.latestWeighedAtIso)})`,
+      // ASCII "->" only: the arrow glyph (U+2192) isn't in the standard PDF font.
+      `${g.birthWeightG} g (${formatDate(g.birthWeighedAtIso)}) -> ${g.latestWeightG} g (${formatDate(g.latestWeighedAtIso)})`,
     );
     labelValue(doc, "Average gain", g.avgGainPerDay !== null ? `${g.avgGainPerDay} g/day` : "—");
   } else {

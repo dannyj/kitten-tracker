@@ -38,12 +38,27 @@ export function VaccinationFields({
     known ? defaults!.type! : defaults?.type ? "other" : "FVRCP",
   );
   const [otherType, setOtherType] = useState<string>(known ? "" : (defaults?.type ?? ""));
-  const [givenAt, setGivenAt] = useState<string>(defaults?.givenAtIso ?? todayIso());
-  const [nextDue, setNextDue] = useState<string>(defaults?.nextDueDateIso ?? "");
+  const initialType = known ? defaults!.type! : defaults?.type ? "other" : "FVRCP";
+  const initialGiven = defaults?.givenAtIso ?? todayIso();
+  const [givenAt, setGivenAt] = useState<string>(initialGiven);
+
+  function suggest(nextType: string, nextGiven: string): string {
+    const tpl = templates.find((t) => t.vaccineType === nextType);
+    return tpl ? (suggestNextDueDate(nextGiven, tpl) ?? "") : "";
+  }
+
+  // On a fresh add, prefill the next-due from the default type's template. On
+  // edit/correct, keep the entry's own value (don't invent one).
+  const [nextDue, setNextDue] = useState<string>(
+    defaults?.nextDueDateIso != null
+      ? defaults.nextDueDateIso
+      : defaults
+        ? ""
+        : suggest(initialType, initialGiven),
+  );
 
   function applyTemplate(nextType: string, nextGiven: string) {
-    const tpl = templates.find((t) => t.vaccineType === nextType);
-    setNextDue(tpl ? (suggestNextDueDate(nextGiven, tpl) ?? "") : "");
+    setNextDue(suggest(nextType, nextGiven));
   }
 
   return (
