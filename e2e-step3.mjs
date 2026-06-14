@@ -70,6 +70,10 @@ try {
   // Litter B is the orphan overview litter (4 active kittens).
   const eenHref = await kittenIdByName("Een");
   await page.goto(`${BASE}${eenHref}`);
+  // "Weigh litter" lives on the litter page (and kittens list), not the kitten
+  // detail — reach it via the kitten's "Compare with littermates" link.
+  await page.click("a:has-text('Compare with littermates')");
+  await page.waitForURL(/\/litters\/\d+$/);
   await page.click("a:has-text('Weigh litter')");
   await page.waitForURL(/\/litters\/\d+\/weigh/);
   // One numeric input per active kitten, plus the shared "When" field.
