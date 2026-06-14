@@ -9,8 +9,9 @@ import { requireUser } from "@/lib/auth/guard";
 import { WEIGHT_EDIT_WINDOW_MS, WEIGHT_MAX_G, WEIGHT_MIN_G } from "@/lib/constants";
 import { formValues, type FormState } from "@/lib/forms";
 
-// datetime-local strings ("YYYY-MM-DDTHH:mm") are local time; new Date() parses
-// them as such. Reject the unparseable, the far-future, and the absurd-past.
+// The client pins the datetime-local value to an absolute ISO instant (with
+// timezone) before submitting, so new Date() parses it the same regardless of
+// the server's timezone. Reject the unparseable, far-future, and absurd-past.
 const weighedAtSchema = z
   .string()
   .min(1, "Weighing time is required")

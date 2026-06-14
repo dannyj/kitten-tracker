@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { WEIGHT_MAX_G, WEIGHT_MIN_G, WEIGHT_SOFT_MAX_G, WEIGHT_SOFT_MIN_G } from "@/lib/constants";
-import { toDatetimeLocal } from "@/lib/dates";
+import { datetimeLocalToIso, toDatetimeLocal } from "@/lib/dates";
 import { addWeights, type BulkWeighState } from "../../../kittens/weight-actions";
 
 export type WeighTarget = {
@@ -78,7 +78,7 @@ export function WeighFlow({ litterId, kittens }: { litterId: number; kittens: We
     }
 
     const fd = new FormData();
-    fd.set("weighedAt", when);
+    fd.set("weighedAt", datetimeLocalToIso(when));
     fd.set("litterId", String(litterId));
     for (const { k, value } of filled) fd.set(`weight_${k.id}`, value);
     formAction(fd);

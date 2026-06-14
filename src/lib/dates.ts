@@ -25,6 +25,24 @@ export function toDatetimeLocal(date: Date): string {
 }
 
 /**
+ * Convert a datetime-local string ("YYYY-MM-DDTHH:mm", browser wall-clock) into
+ * an absolute ISO instant. Run this on the client: the browser interprets the
+ * naive string in its own timezone, pinning the instant before it reaches the
+ * server — which would otherwise re-parse the naive string in the server's
+ * timezone (UTC in production) and read the time as hours off.
+ */
+export function datetimeLocalToIso(value: string): string {
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? value : d.toISOString();
+}
+
+/** In place, replace a datetime-local form field with an absolute ISO instant. */
+export function pinDatetimeField(formData: FormData, field: string): void {
+  const v = formData.get(field);
+  if (typeof v === "string" && v) formData.set(field, datetimeLocalToIso(v));
+}
+
+/**
  * Age in "3w 2d" format from an ISO birth date, optionally frozen at `until`
  * (deceased kittens). Returns null when the birth date is missing/invalid or
  * in the future. `estimated` adds a "~" prefix.

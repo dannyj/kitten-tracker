@@ -12,7 +12,7 @@ import {
   WEIGHT_SOFT_MAX_G,
   WEIGHT_SOFT_MIN_G,
 } from "@/lib/constants";
-import { formatDateTime, toDatetimeLocal } from "@/lib/dates";
+import { formatDateTime, pinDatetimeField, toDatetimeLocal } from "@/lib/dates";
 import type { FormState } from "@/lib/forms";
 import { useNow } from "@/lib/use-now";
 import { addWeight, deleteWeight, updateWeight } from "../weight-actions";
@@ -53,6 +53,7 @@ function QuickAdd({ kittenId }: { kittenId: number }) {
     const formData = new FormData(e.currentTarget);
     const grams = Number(formData.get("weightGrams"));
     if (Number.isFinite(grams) && !softConfirm(grams)) return;
+    pinDatetimeField(formData, "weighedAt");
     formAction(formData);
   }
 
@@ -123,6 +124,7 @@ function EditForm({ row, onDone }: { row: WeightRow; onDone: () => void }) {
     async (prev, formData) => {
       const grams = Number(formData.get("weightGrams"));
       if (Number.isFinite(grams) && !softConfirm(grams)) return prev;
+      pinDatetimeField(formData, "weighedAt");
       const result = await updateWeight(prev, formData);
       if (!result) onDone();
       return result;

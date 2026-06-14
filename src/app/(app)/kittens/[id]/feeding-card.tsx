@@ -14,7 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { FEEDING_EDIT_WINDOW_MS, FEEDING_MAX_ML, FEEDING_MIN_ML } from "@/lib/constants";
-import { formatDateTime, toDatetimeLocal } from "@/lib/dates";
+import { formatDateTime, pinDatetimeField, toDatetimeLocal } from "@/lib/dates";
 import {
   expectedDailyMl,
   FEEDING_QUALITY_LABELS,
@@ -151,6 +151,7 @@ function IntervalEditor({
 function EditForm({ row, onDone }: { row: FeedingRow; onDone: () => void }) {
   const [state, formAction, pending] = useActionState<FormState, FormData>(
     async (prev, formData) => {
+      pinDatetimeField(formData, "fedAt");
       const result = await updateFeeding(prev, formData);
       if (!result) onDone();
       return result;

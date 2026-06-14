@@ -18,7 +18,7 @@ import {
   FEEDING_SOFT_MAX_ML,
   FEEDING_SOFT_MIN_ML,
 } from "@/lib/constants";
-import { toDatetimeLocal } from "@/lib/dates";
+import { pinDatetimeField, toDatetimeLocal } from "@/lib/dates";
 import { FEEDING_QUALITY_LABELS } from "@/lib/feeding";
 import type { FormState } from "@/lib/forms";
 
@@ -57,6 +57,7 @@ export function FeedingQuickAdd({
     async (prev, formData) => {
       const ml = Number(formData.get("amountMl"));
       if (Number.isFinite(ml) && !softConfirm(ml)) return prev;
+      pinDatetimeField(formData, "fedAt");
       const result = await addFeeding(prev, formData);
       if (!result) {
         formRef.current?.reset();
