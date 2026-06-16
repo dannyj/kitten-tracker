@@ -229,18 +229,15 @@ export function MedicalCard({
                 ) : (
                   <div className="mt-1 flex gap-1">
                     {editable ? (
-                      <>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 gap-1 px-2 text-xs"
-                          onClick={() => setEditingId(row.id)}
-                        >
-                          <Pencil className="size-3" aria-hidden /> Edit
-                        </Button>
-                        <DeleteButton vaccinationId={row.id} />
-                      </>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 gap-1 px-2 text-xs"
+                        onClick={() => setEditingId(row.id)}
+                      >
+                        <Pencil className="size-3" aria-hidden /> Edit
+                      </Button>
                     ) : (
                       <Button
                         type="button"
@@ -252,6 +249,9 @@ export function MedicalCard({
                         <Pencil className="size-3" aria-hidden /> Correct
                       </Button>
                     )}
+                    {/* Delete stays available past the edit window so a record
+                        added in error can always be removed. */}
+                    <DeleteButton vaccinationId={row.id} />
                   </div>
                 )}
               </li>

@@ -1,6 +1,6 @@
 "use client";
 
-import { Pencil, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronUp, Pencil, Trash2 } from "lucide-react";
 import { useActionState, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -207,7 +207,15 @@ export function WeightsCard({
   manage?: boolean;
 }) {
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [expanded, setExpanded] = useState(false);
   const now = useNow();
+
+  // On the kitten overview, keep the history short (most recent few) so it
+  // doesn't push the photos and other cards far down the page. The Manage
+  // entries view always shows everything.
+  const COLLAPSED_COUNT = 5;
+  const collapsible = !manage && rows.length > COLLAPSED_COUNT;
+  const visibleRows = collapsible && !expanded ? rows.slice(0, COLLAPSED_COUNT) : rows;
 
   return (
     <div className="flex flex-col gap-4">
@@ -217,7 +225,7 @@ export function WeightsCard({
         <p className="text-muted-foreground text-sm">No weights recorded yet.</p>
       ) : (
         <ul className="flex flex-col gap-2">
-          {rows.map((row, i) => {
+          {visibleRows.map((row, i) => {
             const older = rows[i + 1]; // rows are newest-first
             const delta = older ? row.weightGrams - older.weightGrams : null;
             const editable =
@@ -268,6 +276,27 @@ export function WeightsCard({
           })}
         </ul>
       )}
+
+      {collapsible ? (
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="self-start gap-1 px-2 text-xs"
+          onClick={() => setExpanded((v) => !v)}
+        >
+          {expanded ? (
+            <>
+              <ChevronUp className="size-3" aria-hidden /> Show less
+            </>
+          ) : (
+            <>
+              <ChevronDown className="size-3" aria-hidden /> See more ({rows.length - COLLAPSED_COUNT}{" "}
+              older)
+            </>
+          )}
+        </Button>
+      ) : null}
     </div>
   );
 }

@@ -109,9 +109,14 @@ export async function deleteVaccination(_prev: FormState, formData: FormData): P
   if (!id.success) return { error: "Invalid entry" };
   const entry = db.select().from(vaccinations).where(eq(vaccinations.id, id.data)).get();
   if (!entry) return { error: "Entry not found" };
-  if (Date.now() - entry.createdAt.getTime() > VACCINATION_EDIT_WINDOW_MS) {
-    return { error: "This medical record is locked and can't be deleted." };
-  }
+  // A record added in error stays removable past the edit window: the
+  // append-only correction flow keeps legitimate history on file, but an
+  // outright mistake should be deletable. Detach any corrections that point at
+  // this row first so we never leave a dangling correctsId reference.
+  db.update(vaccinations)
+    .set({ correctsId: null })
+    .where(eq(vaccinations.correctsId, id.data))
+    .run();
   db.delete(vaccinations).where(eq(vaccinations.id, id.data)).run();
   revalidateVaccination(entry.kittenId);
   return null;
