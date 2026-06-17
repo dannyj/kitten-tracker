@@ -69,7 +69,7 @@ export function LitterGrowthChart({ series }: { series: LitterSeries[] }) {
         </Button>
       </div>
       <ResponsiveContainer width="100%" height={280}>
-        <LineChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: -16 }}>
+        <LineChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
           <XAxis
             dataKey="t"
@@ -80,7 +80,7 @@ export function LitterGrowthChart({ series }: { series: LitterSeries[] }) {
             fontSize={11}
             minTickGap={24}
           />
-          <YAxis fontSize={11} width={44} unit={mode === "absolute" ? "g" : "%"} />
+          <YAxis fontSize={11} width={52} unit={mode === "absolute" ? "g" : "%"} />
           <Tooltip
             labelFormatter={(ms) => formatTick(Number(ms))}
             formatter={(value, name) => [mode === "absolute" ? `${value} g` : `${value}%`, name]}

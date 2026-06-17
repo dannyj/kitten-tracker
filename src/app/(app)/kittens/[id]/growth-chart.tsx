@@ -48,7 +48,7 @@ export function GrowthChart({ points }: { points: GrowthChartPoint[] }) {
 
   return (
     <ResponsiveContainer width="100%" height={240}>
-      <ComposedChart data={points} margin={{ top: 8, right: 8, bottom: 0, left: -16 }}>
+      <ComposedChart data={points} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
         <XAxis
           dataKey="t"
@@ -59,9 +59,12 @@ export function GrowthChart({ points }: { points: GrowthChartPoint[] }) {
           fontSize={11}
           minTickGap={24}
         />
+        {/* width must fit the widest label incl. the "g" unit; weights run to
+            four digits (heavy kittens), and a negative left margin would clip
+            the leading digit, so keep margin.left at 0. */}
         <YAxis
           fontSize={11}
-          width={44}
+          width={52}
           unit="g"
           domain={weightDomain(points)}
           allowDecimals={false}
