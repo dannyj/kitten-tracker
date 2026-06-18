@@ -8,7 +8,47 @@ import type { FormState } from "@/lib/forms";
 import type { ScheduleTemplate } from "@/lib/schedule";
 import { resetScheduleTemplates, saveScheduleTemplates } from "./actions";
 
-export function ScheduleTemplatesForm({ templates }: { templates: ScheduleTemplate[] }) {
+function fieldName(tpl: ScheduleTemplate, name: string) {
+  return `${tpl.subjectType}__${tpl.vaccineType}__${name}`;
+}
+
+function WeekInput({
+  tpl,
+  name,
+  label,
+  min = 0,
+}: {
+  tpl: ScheduleTemplate;
+  name: "firstWeeks" | "everyWeeks" | "untilWeeks";
+  label: string;
+  min?: number;
+}) {
+  const id = fieldName(tpl, name);
+  return (
+    <div className="flex flex-col gap-1">
+      <Label htmlFor={id} className="text-xs">
+        {label}
+      </Label>
+      <Input
+        id={id}
+        name={id}
+        type="number"
+        step="0.5"
+        min={min}
+        required
+        defaultValue={tpl[name]}
+      />
+    </div>
+  );
+}
+
+export function ScheduleTemplatesForm({
+  kittenTemplates,
+  motherTemplates,
+}: {
+  kittenTemplates: ScheduleTemplate[];
+  motherTemplates: ScheduleTemplate[];
+}) {
   const [state, formAction, pending] = useActionState<FormState, FormData>(
     saveScheduleTemplates,
     null,
@@ -20,56 +60,43 @@ export function ScheduleTemplatesForm({ templates }: { templates: ScheduleTempla
 
   return (
     <div className="flex flex-col gap-4">
-      <form action={formAction} className="flex flex-col gap-4">
-        {templates.map((tpl) => (
-          <div key={tpl.vaccineType} className="flex flex-col gap-2 rounded-lg border p-3">
-            <p className="text-sm font-medium">{tpl.label}</p>
-            <div className="grid grid-cols-3 gap-2">
-              <div className="flex flex-col gap-1">
-                <Label htmlFor={`${tpl.vaccineType}__firstWeeks`} className="text-xs">
-                  First (weeks)
-                </Label>
-                <Input
-                  id={`${tpl.vaccineType}__firstWeeks`}
-                  name={`${tpl.vaccineType}__firstWeeks`}
-                  type="number"
-                  step="0.5"
-                  min={0}
-                  required
-                  defaultValue={tpl.firstWeeks}
-                />
-              </div>
-              <div className="flex flex-col gap-1">
-                <Label htmlFor={`${tpl.vaccineType}__everyWeeks`} className="text-xs">
-                  Every (weeks)
-                </Label>
-                <Input
-                  id={`${tpl.vaccineType}__everyWeeks`}
-                  name={`${tpl.vaccineType}__everyWeeks`}
-                  type="number"
-                  step="0.5"
-                  min={0}
-                  required
-                  defaultValue={tpl.everyWeeks}
-                />
-              </div>
-              <div className="flex flex-col gap-1">
-                <Label htmlFor={`${tpl.vaccineType}__untilWeeks`} className="text-xs">
-                  Until (weeks)
-                </Label>
-                <Input
-                  id={`${tpl.vaccineType}__untilWeeks`}
-                  name={`${tpl.vaccineType}__untilWeeks`}
-                  type="number"
-                  step="0.5"
-                  min={0}
-                  required
-                  defaultValue={tpl.untilWeeks}
-                />
+      <form action={formAction} className="flex flex-col gap-6">
+        <div className="flex flex-col gap-3">
+          <p className="text-sm font-semibold">Kittens</p>
+          {kittenTemplates.map((tpl) => (
+            <div key={fieldName(tpl, "row")} className="flex flex-col gap-2 rounded-lg border p-3">
+              <p className="text-sm font-medium">{tpl.label}</p>
+              <div className="grid grid-cols-3 gap-2">
+                <WeekInput tpl={tpl} name="firstWeeks" label="First (weeks)" min={0.5} />
+                <WeekInput tpl={tpl} name="everyWeeks" label="Every (weeks)" min={0.5} />
+                <WeekInput tpl={tpl} name="untilWeeks" label="Until (weeks)" min={0.5} />
               </div>
             </div>
+          ))}
+        </div>
+
+        <div className="flex flex-col gap-3">
+          <div>
+            <p className="text-sm font-semibold">Adult cat (mother)</p>
+            <p className="text-muted-foreground text-xs">
+              Adults have no birth-based schedule, so only the booster interval applies — it
+              prefills the next-due when a treatment is logged. Set 0 for a one-off (microchip) or a
+              treatment you don&apos;t track on a routine (e.g. rabies for indoor-only cats).
+            </p>
           </div>
-        ))}
+          {motherTemplates.map((tpl) => (
+            <div
+              key={fieldName(tpl, "row")}
+              className="flex flex-wrap items-end justify-between gap-2 rounded-lg border p-3"
+            >
+              <p className="text-sm font-medium">{tpl.label}</p>
+              <div className="w-32">
+                <WeekInput tpl={tpl} name="everyWeeks" label="Every (weeks), 0 = one-off" />
+              </div>
+            </div>
+          ))}
+        </div>
+
         {state?.error ? (
           <p role="alert" className="text-destructive text-sm">
             {state.error}

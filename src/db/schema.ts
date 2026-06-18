@@ -22,6 +22,11 @@ export type KittenStatus = (typeof KITTEN_STATUSES)[number];
 export const MOTHER_HEALTH_CATEGORIES = ["eating", "behaviour", "medical", "other"] as const;
 export const FEEDING_QUALITIES = ["good", "slow", "refused"] as const;
 export const PHOTO_SUBJECT_TYPES = ["kitten", "mother"] as const;
+// Medical records and schedule templates are keyed to either subject, mirroring
+// photos. No DB-level FK (a column can't point at two tables) — subject
+// existence is checked in the server actions, as with photos.
+export const MEDICAL_SUBJECT_TYPES = ["kitten", "mother"] as const;
+export type MedicalSubjectType = (typeof MEDICAL_SUBJECT_TYPES)[number];
 export const PHOTO_TAKEN_AT_SOURCES = ["exif", "manual", "upload"] as const;
 export const USER_ROLES = ["admin", "viewer"] as const;
 
@@ -114,11 +119,13 @@ export const feedings = sqliteTable("feedings", {
   createdAt: integer("created_at", { mode: "timestamp" }).notNull().default(now),
 });
 
+// Structured medical/treatment records for both kittens and mothers. Despite
+// the table name (kept from when only kittens had them), this now covers
+// microchip, deworming, flea, vaccinations etc. for either subject.
 export const vaccinations = sqliteTable("vaccinations", {
   id: integer("id").primaryKey({ autoIncrement: true }),
-  kittenId: integer("kitten_id")
-    .notNull()
-    .references(() => kittens.id, { onDelete: "cascade" }),
+  subjectType: text("subject_type", { enum: MEDICAL_SUBJECT_TYPES }).notNull(),
+  subjectId: integer("subject_id").notNull(),
   type: text("type").notNull(),
   givenAt: text("given_at").notNull(),
   batchNumber: text("batch_number"),
@@ -128,23 +135,27 @@ export const vaccinations = sqliteTable("vaccinations", {
   // Medical records are append-only: after the 15-minute edit window a
   // correction becomes a NEW row pointing at the original via correctsId,
   // never a silent edit. createdAt drives that window (givenAt is backdatable).
-  correctsId: integer("corrects_id").references((): AnySQLiteColumn => vaccinations.id),
+  // No DB-level self-FK (matches the FK-less subject model above); the actions
+  // validate that a corrected entry belongs to the same subject.
+  correctsId: integer("corrects_id"),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull().default(now),
 });
 
-// Vaccination/deworming schedule templates — convenience defaults (NOT a
-// veterinary protocol), editable in Settings. Seeded in migrate.ts.
+// Treatment schedule templates — convenience defaults (NOT a veterinary
+// protocol), editable in Settings. Kitten and adult-cat (mother) templates are
+// distinct rows keyed by subjectType. Seeded in migrate.ts.
 export const scheduleTemplates = sqliteTable(
   "schedule_templates",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
+    subjectType: text("subject_type", { enum: MEDICAL_SUBJECT_TYPES }).notNull().default("kitten"),
     vaccineType: text("vaccine_type").notNull(),
     label: text("label").notNull(),
     firstWeeks: real("first_weeks").notNull(),
     everyWeeks: real("every_weeks").notNull(),
     untilWeeks: real("until_weeks").notNull(),
   },
-  (t) => [uniqueIndex("schedule_templates_type_unique").on(t.vaccineType)],
+  (t) => [uniqueIndex("schedule_templates_subject_type_unique").on(t.subjectType, t.vaccineType)],
 );
 
 export const photos = sqliteTable("photos", {

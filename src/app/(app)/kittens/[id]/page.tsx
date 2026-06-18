@@ -1,4 +1,4 @@
-import { asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 import { Camera, Cat, LineChart, Milk, Pencil, Pill, Scale, UtensilsCrossed } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -111,7 +111,7 @@ export default async function KittenDetailPage({ params }: { params: Promise<{ i
   const vaccinationRowsRaw = db
     .select()
     .from(vaccinations)
-    .where(eq(vaccinations.kittenId, kitten.id))
+    .where(and(eq(vaccinations.subjectType, "kitten"), eq(vaccinations.subjectId, kitten.id)))
     .orderBy(desc(vaccinations.givenAt), desc(vaccinations.id))
     .all();
   const givenAtById = new Map(vaccinationRowsRaw.map((v) => [v.id, v.givenAt]));
@@ -129,7 +129,7 @@ export default async function KittenDetailPage({ params }: { params: Promise<{ i
   const kittenPhotos = getSubjectPhotos("kitten", kitten.id);
   // Cover photo for the header: chosen cover, else most recent, else placeholder.
   const coverPhotoId = kitten.coverPhotoId ?? kittenPhotos.at(-1)?.id ?? null;
-  const scheduleTemplatesList = getScheduleTemplates();
+  const scheduleTemplatesList = getScheduleTemplates("kitten");
   // Count administered events (originals only, not corrections) per type.
   const givenCountByType: Record<string, number> = {};
   for (const v of vaccinationRowsRaw) {
@@ -421,7 +421,8 @@ export default async function KittenDetailPage({ params }: { params: Promise<{ i
             </CardHeader>
             <CardContent className="flex flex-col gap-4">
               <MedicalCard
-                kittenId={kitten.id}
+                subjectType="kitten"
+                subjectId={kitten.id}
                 templates={scheduleTemplatesList}
                 rows={vaccinationRows}
                 dueItems={dueItems}

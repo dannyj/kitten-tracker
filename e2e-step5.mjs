@@ -226,7 +226,7 @@ try {
   );
   // edit template: FVRCP everyWeeks 3 -> 5
   await page.goto(`${BASE}/settings`);
-  await page.fill("#FVRCP__everyWeeks", "5");
+  await page.fill("#kitten__FVRCP__everyWeeks", "5");
   await page.click("button:has-text('Save templates')");
   await page.waitForTimeout(500);
   await page.goto(`${BASE}${pip}`);

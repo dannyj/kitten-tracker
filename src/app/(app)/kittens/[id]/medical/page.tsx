@@ -1,4 +1,4 @@
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -27,7 +27,7 @@ export default async function ManageMedicalPage({ params }: { params: Promise<{ 
   const raw = db
     .select()
     .from(vaccinations)
-    .where(eq(vaccinations.kittenId, kitten.id))
+    .where(and(eq(vaccinations.subjectType, "kitten"), eq(vaccinations.subjectId, kitten.id)))
     .orderBy(desc(vaccinations.givenAt), desc(vaccinations.id))
     .all();
   const givenAtById = new Map(raw.map((v) => [v.id, v.givenAt]));
@@ -60,8 +60,9 @@ export default async function ManageMedicalPage({ params }: { params: Promise<{ 
             use &ldquo;Correct&rdquo; to add a referenced correction without changing the original.
           </p>
           <MedicalCard
-            kittenId={kitten.id}
-            templates={getScheduleTemplates()}
+            subjectType="kitten"
+            subjectId={kitten.id}
+            templates={getScheduleTemplates("kitten")}
             rows={rows}
             dueItems={[]}
             manage

@@ -14,7 +14,12 @@ import {
 } from "@/components/ui/select";
 import { todayIso } from "@/lib/dates";
 import type { FormState } from "@/lib/forms";
-import { suggestNextDueDate, VACCINE_TYPES, type ScheduleTemplate } from "@/lib/schedule";
+import {
+  suggestNextDueDate,
+  VACCINE_TYPES,
+  type MedicalSubjectType,
+  type ScheduleTemplate,
+} from "@/lib/schedule";
 
 export type VaccinationDefaults = {
   type?: string;
@@ -29,16 +34,20 @@ export type VaccinationDefaults = {
 export function VaccinationFields({
   templates,
   defaults,
+  types = VACCINE_TYPES,
 }: {
   templates: ScheduleTemplate[];
   defaults?: VaccinationDefaults;
+  /** Selectable types for this subject ("other" must be last, allows free text). */
+  types?: readonly string[];
 }) {
-  const known = defaults?.type && (VACCINE_TYPES as readonly string[]).includes(defaults.type);
+  const fallbackType = types[0];
+  const known = defaults?.type && types.includes(defaults.type);
   const [type, setType] = useState<string>(
-    known ? defaults!.type! : defaults?.type ? "other" : "FVRCP",
+    known ? defaults!.type! : defaults?.type ? "other" : fallbackType,
   );
   const [otherType, setOtherType] = useState<string>(known ? "" : (defaults?.type ?? ""));
-  const initialType = known ? defaults!.type! : defaults?.type ? "other" : "FVRCP";
+  const initialType = known ? defaults!.type! : defaults?.type ? "other" : fallbackType;
   const initialGiven = defaults?.givenAtIso ?? todayIso();
   const [givenAt, setGivenAt] = useState<string>(initialGiven);
 
@@ -77,7 +86,7 @@ export function VaccinationFields({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {VACCINE_TYPES.map((t) => (
+              {types.map((t) => (
                 <SelectItem key={t} value={t}>
                   {t}
                 </SelectItem>
@@ -149,15 +158,19 @@ export function VaccinationFields({
   );
 }
 
-/** Standalone add form, reused on the kitten detail card and the dashboard dialog. */
+/** Standalone add form, reused on the detail cards and the dashboard dialog. */
 export function VaccinationQuickAdd({
-  kittenId,
+  subjectType,
+  subjectId,
   templates,
+  types,
   defaultType,
   onAdded,
 }: {
-  kittenId: number;
+  subjectType: MedicalSubjectType;
+  subjectId: number;
   templates: ScheduleTemplate[];
+  types?: readonly string[];
   defaultType?: string;
   onAdded?: () => void;
 }) {
@@ -176,9 +189,11 @@ export function VaccinationQuickAdd({
 
   return (
     <form ref={formRef} action={formAction} className="flex flex-col gap-3 rounded-lg border p-3">
-      <input type="hidden" name="kittenId" value={kittenId} />
+      <input type="hidden" name="subjectType" value={subjectType} />
+      <input type="hidden" name="subjectId" value={subjectId} />
       <VaccinationFields
         templates={templates}
+        types={types}
         defaults={defaultType ? { type: defaultType } : undefined}
       />
       {state?.error ? (

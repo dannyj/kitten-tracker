@@ -1,6 +1,6 @@
 "use server";
 
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/db";
@@ -53,17 +53,33 @@ export async function resetAlertSettings(): Promise<void> {
 }
 
 // --- Schedule templates ---
+//
+// Kitten templates are birth-date driven, so all three week values matter and
+// must be positive. Adult-cat (mother) templates are record driven: only the
+// booster interval is meaningful, and 0 means "one-off / not routinely
+// recurring" (microchip, rabies for indoor NL cats, FeLV). Form field names are
+// namespaced by subject (deworming/flea/FVRCP exist for both subjects).
 
-const weeks = (label: string) => z.coerce.number().positive(`${label} must be positive`).max(104);
-const templateSchema = z.object({
-  firstWeeks: weeks("First dose age"),
-  everyWeeks: weeks("Booster interval"),
-  untilWeeks: weeks("Until age"),
+const positiveWeeks = (label: string) =>
+  z.coerce.number().positive(`${label} must be positive`).max(104);
+const kittenTemplateSchema = z.object({
+  firstWeeks: positiveWeeks("First dose age"),
+  everyWeeks: positiveWeeks("Booster interval"),
+  untilWeeks: positiveWeeks("Until age"),
 });
+// 0 allowed = one-off; first/until are unused for adults and stay at 0.
+const motherEveryWeeks = z.coerce
+  .number()
+  .min(0, "Interval can't be negative")
+  .max(104, "Interval is too large");
 
 function revalidateMedical() {
   revalidatePath("/settings");
   revalidatePath("/"); // dashboard medical-due panel reads templates
+}
+
+function field(subjectType: string, vaccineType: string, name: string) {
+  return `${subjectType}__${vaccineType}__${name}`;
 }
 
 export async function saveScheduleTemplates(
@@ -72,29 +88,48 @@ export async function saveScheduleTemplates(
 ): Promise<FormState> {
   await requireAdmin();
   const existing = db
-    .select({ vaccineType: scheduleTemplates.vaccineType })
+    .select({
+      subjectType: scheduleTemplates.subjectType,
+      vaccineType: scheduleTemplates.vaccineType,
+    })
     .from(scheduleTemplates)
     .all();
 
-  const updates: { vaccineType: string; values: z.infer<typeof templateSchema> }[] = [];
-  for (const { vaccineType } of existing) {
-    const parsed = templateSchema.safeParse({
-      firstWeeks: formData.get(`${vaccineType}__firstWeeks`),
-      everyWeeks: formData.get(`${vaccineType}__everyWeeks`),
-      untilWeeks: formData.get(`${vaccineType}__untilWeeks`),
-    });
-    if (!parsed.success) return { error: `${vaccineType}: ${parsed.error.issues[0].message}` };
-    if (parsed.data.firstWeeks > parsed.data.untilWeeks) {
-      return { error: `${vaccineType}: first dose age can't be later than the "until" age.` };
+  const updates: {
+    subjectType: string;
+    vaccineType: string;
+    values: { firstWeeks?: number; everyWeeks: number; untilWeeks?: number };
+  }[] = [];
+  for (const { subjectType, vaccineType } of existing) {
+    const label = `${vaccineType}`;
+    if (subjectType === "mother") {
+      const parsed = motherEveryWeeks.safeParse(formData.get(field(subjectType, vaccineType, "everyWeeks")));
+      if (!parsed.success) return { error: `${label}: ${parsed.error.issues[0].message}` };
+      updates.push({ subjectType, vaccineType, values: { everyWeeks: parsed.data } });
+    } else {
+      const parsed = kittenTemplateSchema.safeParse({
+        firstWeeks: formData.get(field(subjectType, vaccineType, "firstWeeks")),
+        everyWeeks: formData.get(field(subjectType, vaccineType, "everyWeeks")),
+        untilWeeks: formData.get(field(subjectType, vaccineType, "untilWeeks")),
+      });
+      if (!parsed.success) return { error: `${label}: ${parsed.error.issues[0].message}` };
+      if (parsed.data.firstWeeks > parsed.data.untilWeeks) {
+        return { error: `${label}: first dose age can't be later than the "until" age.` };
+      }
+      updates.push({ subjectType, vaccineType, values: parsed.data });
     }
-    updates.push({ vaccineType, values: parsed.data });
   }
 
   db.transaction((tx) => {
     for (const u of updates) {
       tx.update(scheduleTemplates)
         .set(u.values)
-        .where(eq(scheduleTemplates.vaccineType, u.vaccineType))
+        .where(
+          and(
+            eq(scheduleTemplates.subjectType, u.subjectType as "kitten" | "mother"),
+            eq(scheduleTemplates.vaccineType, u.vaccineType),
+          ),
+        )
         .run();
     }
   });
@@ -108,7 +143,12 @@ export async function resetScheduleTemplates(): Promise<void> {
     for (const tpl of DEFAULT_SCHEDULE_TEMPLATES as ScheduleTemplate[]) {
       tx.update(scheduleTemplates)
         .set({ firstWeeks: tpl.firstWeeks, everyWeeks: tpl.everyWeeks, untilWeeks: tpl.untilWeeks })
-        .where(eq(scheduleTemplates.vaccineType, tpl.vaccineType))
+        .where(
+          and(
+            eq(scheduleTemplates.subjectType, tpl.subjectType),
+            eq(scheduleTemplates.vaccineType, tpl.vaccineType),
+          ),
+        )
         .run();
     }
   });

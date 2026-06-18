@@ -1,4 +1,4 @@
-import { inArray } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { Cat, Pill, TriangleAlert, UtensilsCrossed } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -7,11 +7,12 @@ import { FeedCountdown } from "@/components/feed-countdown";
 import { StatusBadge } from "@/components/status-badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { db } from "@/db";
-import { feedings, kittens } from "@/db/schema";
+import { feedings, kittens, mothers } from "@/db/schema";
 import { TREND_ARROW } from "@/lib/alerts";
 import { requireUser } from "@/lib/auth/guard";
 import { formatAge, todayIso } from "@/lib/dates";
-import { medicalDueByKitten } from "@/lib/medical-data";
+import { medicalDueByKitten, motherDueBySubject } from "@/lib/medical-data";
+import { daysUntil } from "@/lib/schedule";
 import { coverPhotoIdByKitten } from "@/lib/photo-data";
 import { getAlertSettings, getScheduleTemplates } from "@/lib/settings";
 import { ACTIVE_STATUSES } from "@/lib/status";
@@ -65,24 +66,53 @@ export default async function DashboardPage() {
       lastFedMs: lastFedByKitten.get(k.id) ?? null,
     }));
 
-  // Medical-due: active kittens with vaccinations overdue or due ≤7 days.
-  const templates = getScheduleTemplates();
+  // Medical-due: active kittens + in-care mothers with treatments overdue or due
+  // ≤7 days. Kittens are template/birth-date driven; mothers are record driven.
+  const WITHIN_DAYS = 7;
+  const kittenTemplates = getScheduleTemplates("kitten");
+  const motherTemplates = getScheduleTemplates("mother");
   const today = todayIso();
   const dueByKitten = medicalDueByKitten(
     activeKittens.map((k) => ({ id: k.id, birthDate: k.birthDate })),
-    templates,
+    kittenTemplates,
     today,
   );
-  const medicalRows: MedicalDueRow[] = activeKittens.flatMap((k) =>
+  const kittenMedicalRows: MedicalDueRow[] = activeKittens.flatMap((k) =>
     (dueByKitten.get(k.id) ?? []).map((item) => ({
-      kittenId: k.id,
-      kittenName: k.name,
+      subjectType: "kitten" as const,
+      subjectId: k.id,
+      subjectName: k.name,
       vaccineType: item.vaccineType,
       label: item.label,
       dueDateIso: item.dueDateIso,
       overdue: item.overdue,
     })),
   );
+
+  const careMothers = db
+    .select({ id: mothers.id, name: mothers.name })
+    .from(mothers)
+    .where(eq(mothers.status, "in_care"))
+    .all();
+  const dueByMother = motherDueBySubject(
+    careMothers.map((m) => m.id),
+    motherTemplates,
+    today,
+  );
+  const motherMedicalRows: MedicalDueRow[] = careMothers.flatMap((m) =>
+    (dueByMother.get(m.id) ?? [])
+      .filter((item) => item.overdue || daysUntil(item.dueDateIso, today) <= WITHIN_DAYS)
+      .map((item) => ({
+        subjectType: "mother" as const,
+        subjectId: m.id,
+        subjectName: m.name,
+        vaccineType: item.vaccineType,
+        label: item.label,
+        dueDateIso: item.dueDateIso,
+        overdue: item.overdue,
+      })),
+  );
+  const medicalRows: MedicalDueRow[] = [...kittenMedicalRows, ...motherMedicalRows];
 
   // Alert center: flagged (urgent first), then warnings.
   const flagged = activeKittens
@@ -157,7 +187,12 @@ export default async function DashboardPage() {
         <h2 className="flex items-center gap-2 text-lg font-medium">
           <Pill className="size-5" aria-hidden /> Medical due
         </h2>
-        <DashboardMedical rows={medicalRows} templates={templates} todayIso={today} />
+        <DashboardMedical
+          rows={medicalRows}
+          kittenTemplates={kittenTemplates}
+          motherTemplates={motherTemplates}
+          todayIso={today}
+        />
       </section>
 
       <section className="flex flex-col gap-3">

@@ -26,8 +26,8 @@ const insWeight = db.prepare(
   "INSERT INTO weight_entries (kitten_id, weighed_at, weight_grams, note, created_at) VALUES (?, ?, ?, NULL, ?)",
 );
 const insVacc = db.prepare(
-  `INSERT INTO vaccinations (kitten_id, type, given_at, batch_number, administered_by, next_due_date, note, corrects_id, created_at)
-   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  `INSERT INTO vaccinations (subject_type, subject_id, type, given_at, batch_number, administered_by, next_due_date, note, corrects_id, created_at)
+   VALUES ('kitten', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 );
 const insAdopter = db.prepare(
   `INSERT INTO adopters (kitten_id, name, phone, email, address, adoption_date, shelter_reference, note)

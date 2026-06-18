@@ -10,6 +10,7 @@ import {
 } from "./schedule.ts";
 
 const FVRCP: ScheduleTemplate = {
+  subjectType: "kitten",
   vaccineType: "FVRCP",
   label: "FVRCP",
   firstWeeks: 7,
@@ -17,11 +18,20 @@ const FVRCP: ScheduleTemplate = {
   untilWeeks: 16,
 };
 const DEWORM: ScheduleTemplate = {
+  subjectType: "kitten",
   vaccineType: "deworming",
   label: "Deworming",
   firstWeeks: 2,
   everyWeeks: 2,
   untilWeeks: 8,
+};
+const MICROCHIP: ScheduleTemplate = {
+  subjectType: "mother",
+  vaccineType: "microchip",
+  label: "Microchip",
+  firstWeeks: 0,
+  everyWeeks: 0,
+  untilWeeks: 0,
 };
 
 test("addDaysIso handles month boundaries", () => {
@@ -65,6 +75,11 @@ test("nextDueForType: null once the schedule is complete", () => {
 
 test("suggestNextDueDate: given + booster interval", () => {
   assert.equal(suggestNextDueDate("2026-06-01", FVRCP), addDaysIso("2026-06-01", 21));
+});
+
+test("suggestNextDueDate: one-off (everyWeeks 0) prefills nothing", () => {
+  // Microchip and other adult one-offs must not auto-suggest a next due date.
+  assert.equal(suggestNextDueDate("2026-06-01", MICROCHIP), null);
 });
 
 test("daysUntil: negative when overdue", () => {

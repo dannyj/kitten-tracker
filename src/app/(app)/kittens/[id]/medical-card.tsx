@@ -7,7 +7,12 @@ import { Button } from "@/components/ui/button";
 import { VACCINATION_EDIT_WINDOW_MS } from "@/lib/constants";
 import { formatDate, todayIso } from "@/lib/dates";
 import type { FormState } from "@/lib/forms";
-import { daysUntil, type DueItem, type ScheduleTemplate } from "@/lib/schedule";
+import {
+  daysUntil,
+  type DueItem,
+  type MedicalSubjectType,
+  type ScheduleTemplate,
+} from "@/lib/schedule";
 import { useNow } from "@/lib/use-now";
 import { addVaccination, deleteVaccination, updateVaccination } from "../vaccination-actions";
 
@@ -26,10 +31,12 @@ export type VaccinationRow = {
 function EditForm({
   row,
   templates,
+  types,
   onDone,
 }: {
   row: VaccinationRow;
   templates: ScheduleTemplate[];
+  types?: readonly string[];
   onDone: () => void;
 }) {
   const [state, formAction, pending] = useActionState<FormState, FormData>(
@@ -43,7 +50,7 @@ function EditForm({
   return (
     <form action={formAction} className="mt-2 flex flex-col gap-2">
       <input type="hidden" name="vaccinationId" value={row.id} />
-      <VaccinationFields templates={templates} defaults={row} />
+      <VaccinationFields templates={templates} types={types} defaults={row} />
       {state?.error ? (
         <p role="alert" className="text-destructive text-sm">
           {state.error}
@@ -63,13 +70,17 @@ function EditForm({
 
 function CorrectForm({
   row,
-  kittenId,
+  subjectType,
+  subjectId,
   templates,
+  types,
   onDone,
 }: {
   row: VaccinationRow;
-  kittenId: number;
+  subjectType: MedicalSubjectType;
+  subjectId: number;
   templates: ScheduleTemplate[];
+  types?: readonly string[];
   onDone: () => void;
 }) {
   const [state, formAction, pending] = useActionState<FormState, FormData>(
@@ -82,13 +93,14 @@ function CorrectForm({
   );
   return (
     <form action={formAction} className="mt-2 flex flex-col gap-2 rounded-md bg-muted/40 p-2">
-      <input type="hidden" name="kittenId" value={kittenId} />
+      <input type="hidden" name="subjectType" value={subjectType} />
+      <input type="hidden" name="subjectId" value={subjectId} />
       <input type="hidden" name="correctsId" value={row.id} />
       <p className="text-muted-foreground text-xs">
         Correcting the entry of {formatDate(row.givenAtIso)}. This creates a new record referencing
         the original — the original stays on file.
       </p>
-      <VaccinationFields templates={templates} defaults={row} />
+      <VaccinationFields templates={templates} types={types} defaults={row} />
       {state?.error ? (
         <p role="alert" className="text-destructive text-sm">
           {state.error}
@@ -130,14 +142,19 @@ function DeleteButton({ vaccinationId }: { vaccinationId: number }) {
 }
 
 export function MedicalCard({
-  kittenId,
+  subjectType,
+  subjectId,
   templates,
+  types,
   rows,
   dueItems,
   manage = false,
 }: {
-  kittenId: number;
+  subjectType: MedicalSubjectType;
+  subjectId: number;
   templates: ScheduleTemplate[];
+  /** Selectable types for this subject; defaults to the kitten list. */
+  types?: readonly string[];
   rows: VaccinationRow[];
   dueItems: DueItem[];
   /** Manage mode: entries with edit/delete/correct (no due list or quick-add). */
@@ -185,7 +202,14 @@ export function MedicalCard({
         </div>
       ) : null}
 
-      {manage ? null : <VaccinationQuickAdd kittenId={kittenId} templates={templates} />}
+      {manage ? null : (
+        <VaccinationQuickAdd
+          subjectType={subjectType}
+          subjectId={subjectId}
+          templates={templates}
+          types={types}
+        />
+      )}
 
       {rows.length === 0 ? (
         <p className="text-muted-foreground text-sm">No medical entries yet.</p>
@@ -218,12 +242,19 @@ export function MedicalCard({
                 {row.note ? <p className="mt-1 text-sm">{row.note}</p> : null}
 
                 {!showControls ? null : editingId === row.id ? (
-                  <EditForm row={row} templates={templates} onDone={() => setEditingId(null)} />
+                  <EditForm
+                    row={row}
+                    templates={templates}
+                    types={types}
+                    onDone={() => setEditingId(null)}
+                  />
                 ) : correctingId === row.id ? (
                   <CorrectForm
                     row={row}
-                    kittenId={kittenId}
+                    subjectType={subjectType}
+                    subjectId={subjectId}
                     templates={templates}
+                    types={types}
                     onDone={() => setCorrectingId(null)}
                   />
                 ) : (

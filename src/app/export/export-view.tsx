@@ -2,8 +2,45 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { formatDate } from "@/lib/dates";
 import { buildChartGeometry, chartToSvg } from "@/lib/export-chart";
-import type { KittenExport } from "@/lib/export-data";
+import type { ExportVaccination, KittenExport, MotherExport } from "@/lib/export-data";
 import { PrintButton } from "./print-button";
+
+const HEALTH_CATEGORY_LABELS: Record<string, string> = {
+  eating: "Eating",
+  behaviour: "Behaviour",
+  medical: "Medical",
+  other: "Other",
+};
+
+/** Shared medical-history list used by both kitten and mother summaries. */
+function MedicalHistory({ items }: { items: ExportVaccination[] }) {
+  if (items.length === 0) {
+    return <p className="text-muted-foreground text-sm">No entries recorded.</p>;
+  }
+  return (
+    <ul className="flex flex-col gap-1.5 text-sm">
+      {items.map((v, i) => {
+        const parts = [
+          v.batchNumber ? `batch ${v.batchNumber}` : null,
+          v.administeredBy ? `by ${v.administeredBy}` : null,
+          v.nextDueDateIso ? `next due ${formatDate(v.nextDueDateIso)}` : null,
+          v.correctsOfDateIso ? `corrects entry of ${formatDate(v.correctsOfDateIso)}` : null,
+        ].filter(Boolean);
+        return (
+          <li key={i}>
+            <span className="font-medium">
+              {formatDate(v.givenAtIso)} — {v.type}
+            </span>
+            {parts.length > 0 ? (
+              <span className="text-muted-foreground"> · {parts.join(" · ")}</span>
+            ) : null}
+            {v.note ? <span className="text-muted-foreground"> · {v.note}</span> : null}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
 
 export function ExportHeader({
   title,
@@ -134,31 +171,7 @@ export function KittenSummary({
 
       <div>
         <h3 className="text-sm font-semibold">Vaccination &amp; medical history</h3>
-        {k.vaccinations.length === 0 ? (
-          <p className="text-muted-foreground text-sm">No entries recorded.</p>
-        ) : (
-          <ul className="flex flex-col gap-1.5 text-sm">
-            {k.vaccinations.map((v, i) => {
-              const parts = [
-                v.batchNumber ? `batch ${v.batchNumber}` : null,
-                v.administeredBy ? `by ${v.administeredBy}` : null,
-                v.nextDueDateIso ? `next due ${formatDate(v.nextDueDateIso)}` : null,
-                v.correctsOfDateIso ? `corrects entry of ${formatDate(v.correctsOfDateIso)}` : null,
-              ].filter(Boolean);
-              return (
-                <li key={i}>
-                  <span className="font-medium">
-                    {formatDate(v.givenAtIso)} — {v.type}
-                  </span>
-                  {parts.length > 0 ? (
-                    <span className="text-muted-foreground"> · {parts.join(" · ")}</span>
-                  ) : null}
-                  {v.note ? <span className="text-muted-foreground"> · {v.note}</span> : null}
-                </li>
-              );
-            })}
-          </ul>
-        )}
+        <MedicalHistory items={k.vaccinations} />
       </div>
 
       {includesAdopter && k.adopter ? (
@@ -178,6 +191,44 @@ export function KittenSummary({
           </dl>
         </div>
       ) : null}
+    </section>
+  );
+}
+
+/** Presentational, print-friendly rendering of a mother's medical summary. */
+export function MotherSummary({ m }: { m: MotherExport }) {
+  return (
+    <section className="flex flex-col gap-3 break-inside-avoid border-t pt-4 first:border-t-0 first:pt-0">
+      <h2 className="text-xl font-semibold">{m.name} (mother)</h2>
+
+      <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+        <Field label="Shelter number" value={m.shelterNumber ?? "—"} />
+        <Field label="Intake date" value={m.intakeDateIso ? formatDate(m.intakeDateIso) : "—"} />
+        <Field label="Status" value={m.statusLabel} />
+      </dl>
+
+      <div>
+        <h3 className="text-sm font-semibold">Medical history</h3>
+        <MedicalHistory items={m.vaccinations} />
+      </div>
+
+      <div>
+        <h3 className="text-sm font-semibold">Health-log notes</h3>
+        {m.healthNotes.length === 0 ? (
+          <p className="text-muted-foreground text-sm">No notes recorded.</p>
+        ) : (
+          <ul className="flex flex-col gap-1 text-sm">
+            {m.healthNotes.map((n, i) => (
+              <li key={i}>
+                <span className="font-medium">{formatDate(n.dateIso)}</span>{" "}
+                <span className="text-muted-foreground">
+                  ({HEALTH_CATEGORY_LABELS[n.category] ?? n.category}): {n.entry}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </section>
   );
 }

@@ -3,7 +3,14 @@ import "server-only";
 import PDFDocument from "pdfkit";
 import { formatDate } from "@/lib/dates";
 import { buildChartGeometry, type ChartGeometry } from "@/lib/export-chart";
-import type { KittenExport } from "@/lib/export-data";
+import type { ExportVaccination, KittenExport, MotherExport } from "@/lib/export-data";
+
+const HEALTH_CATEGORY_LABELS: Record<string, string> = {
+  eating: "Eating",
+  behaviour: "Behaviour",
+  medical: "Medical",
+  other: "Other",
+};
 
 // Standard Helvetica only (WinAnsi covers accents like ë/ï); never emoji — they
 // fail in standard PDF fonts. Every value is drawn via .text() as plain text,
@@ -102,6 +109,30 @@ function labelValue(doc: PDFKit.PDFDocument, label: string, value: string) {
   doc.font("Helvetica").text(value || "—");
 }
 
+/** Shared medical-history block used by both kitten and mother sections. */
+function medicalHistory(doc: PDFKit.PDFDocument, title: string, items: ExportVaccination[]) {
+  doc.moveDown(0.4).font("Helvetica-Bold").fontSize(11).text(title);
+  if (items.length === 0) {
+    doc.font("Helvetica").fontSize(10).text("No entries recorded.");
+    return;
+  }
+  for (const v of items) {
+    doc
+      .font("Helvetica-Bold")
+      .fontSize(10)
+      .text(`${formatDate(v.givenAtIso)} — ${v.type}`);
+    const parts: string[] = [];
+    if (v.batchNumber) parts.push(`batch ${v.batchNumber}`);
+    if (v.administeredBy) parts.push(`by ${v.administeredBy}`);
+    if (v.nextDueDateIso) parts.push(`next due ${formatDate(v.nextDueDateIso)}`);
+    if (v.correctsOfDateIso) parts.push(`corrects entry of ${formatDate(v.correctsOfDateIso)}`);
+    if (parts.length > 0)
+      doc.font("Helvetica").fontSize(9).fillColor("#555").text(parts.join(" · "));
+    if (v.note) doc.font("Helvetica").fontSize(9).fillColor("#555").text(v.note);
+    doc.fillColor("#000");
+  }
+}
+
 function kittenSection(doc: PDFKit.PDFDocument, k: KittenExport, meta: ExportMeta) {
   doc.font("Helvetica-Bold").fontSize(14).text(k.name);
   doc.moveDown(0.2);
@@ -150,26 +181,7 @@ function kittenSection(doc: PDFKit.PDFDocument, k: KittenExport, meta: ExportMet
   }
 
   // Vaccination / medical history
-  doc.moveDown(0.4).font("Helvetica-Bold").fontSize(11).text("Vaccination & medical history");
-  if (k.vaccinations.length === 0) {
-    doc.font("Helvetica").fontSize(10).text("No entries recorded.");
-  } else {
-    for (const v of k.vaccinations) {
-      doc
-        .font("Helvetica-Bold")
-        .fontSize(10)
-        .text(`${formatDate(v.givenAtIso)} — ${v.type}`);
-      const parts: string[] = [];
-      if (v.batchNumber) parts.push(`batch ${v.batchNumber}`);
-      if (v.administeredBy) parts.push(`by ${v.administeredBy}`);
-      if (v.nextDueDateIso) parts.push(`next due ${formatDate(v.nextDueDateIso)}`);
-      if (v.correctsOfDateIso) parts.push(`corrects entry of ${formatDate(v.correctsOfDateIso)}`);
-      if (parts.length > 0)
-        doc.font("Helvetica").fontSize(9).fillColor("#555").text(parts.join(" · "));
-      if (v.note) doc.font("Helvetica").fontSize(9).fillColor("#555").text(v.note);
-      doc.fillColor("#000");
-    }
-  }
+  medicalHistory(doc, "Vaccination & medical history", k.vaccinations);
 
   // Adopter (only present when explicitly included; admin-gated at the route)
   if (meta.includesAdopter && k.adopter) {
@@ -182,6 +194,31 @@ function kittenSection(doc: PDFKit.PDFDocument, k: KittenExport, meta: ExportMet
       labelValue(doc, "Adoption date", formatDate(k.adopter.adoptionDateIso));
     if (k.adopter.shelterReference)
       labelValue(doc, "Shelter reference", k.adopter.shelterReference);
+  }
+}
+
+function motherSection(doc: PDFKit.PDFDocument, m: MotherExport) {
+  doc.font("Helvetica-Bold").fontSize(14).text(`${m.name} (mother)`);
+  doc.moveDown(0.2);
+
+  labelValue(doc, "Shelter number", m.shelterNumber ?? "—");
+  labelValue(doc, "Intake date", m.intakeDateIso ? formatDate(m.intakeDateIso) : "—");
+  labelValue(doc, "Status", m.statusLabel);
+
+  medicalHistory(doc, "Medical history", m.vaccinations);
+
+  doc.moveDown(0.4).font("Helvetica-Bold").fontSize(11).text("Health-log notes");
+  if (m.healthNotes.length === 0) {
+    doc.font("Helvetica").fontSize(10).text("No notes recorded.");
+  } else {
+    for (const n of m.healthNotes) {
+      doc
+        .font("Helvetica")
+        .fontSize(9)
+        .fillColor("#555")
+        .text(`${formatDate(n.dateIso)} (${HEALTH_CATEGORY_LABELS[n.category] ?? n.category}): ${n.entry}`);
+      doc.fillColor("#000");
+    }
   }
 }
 
@@ -215,15 +252,26 @@ export function kittenPdf(k: KittenExport, meta: ExportMeta): Promise<Buffer> {
   return render(doc);
 }
 
+export function motherPdf(m: MotherExport, meta: ExportMeta): Promise<Buffer> {
+  const doc = new PDFDocument({ size: "A4", margin: 48 });
+  header(doc, `Medical summary — ${m.name}`, meta);
+  motherSection(doc, m);
+  footerNote(doc);
+  return render(doc);
+}
+
 export function litterPdf(
   title: string,
+  mother: MotherExport | null,
   kittenList: KittenExport[],
   meta: ExportMeta,
 ): Promise<Buffer> {
   const doc = new PDFDocument({ size: "A4", margin: 48 });
   header(doc, `Medical summary — ${title}`, meta);
+  // Mother first (her own section), then one page per kitten.
+  if (mother) motherSection(doc, mother);
   kittenList.forEach((k, i) => {
-    if (i > 0) doc.addPage();
+    if (mother || i > 0) doc.addPage();
     kittenSection(doc, k, meta);
   });
   if (kittenList.length === 0)

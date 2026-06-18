@@ -13,19 +13,33 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { formatDate } from "@/lib/dates";
-import { daysUntil, type ScheduleTemplate } from "@/lib/schedule";
+import {
+  daysUntil,
+  MOTHER_VACCINE_TYPES,
+  VACCINE_TYPES,
+  type MedicalSubjectType,
+  type ScheduleTemplate,
+} from "@/lib/schedule";
 
 export type MedicalDueRow = {
-  kittenId: number;
-  kittenName: string;
+  subjectType: MedicalSubjectType;
+  subjectId: number;
+  subjectName: string;
   vaccineType: string;
   label: string;
   dueDateIso: string;
   overdue: boolean;
 };
 
-function LogDialog({ row, templates }: { row: MedicalDueRow; templates: ScheduleTemplate[] }) {
+function LogDialog({
+  row,
+  templates,
+}: {
+  row: MedicalDueRow;
+  templates: ScheduleTemplate[];
+}) {
   const [open, setOpen] = useState(false);
+  const types = row.subjectType === "mother" ? MOTHER_VACCINE_TYPES : VACCINE_TYPES;
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
@@ -36,12 +50,14 @@ function LogDialog({ row, templates }: { row: MedicalDueRow; templates: Schedule
       <DialogContent className="max-h-[90svh] overflow-y-auto sm:max-w-sm">
         <DialogHeader>
           <DialogTitle>
-            Log {row.label} — {row.kittenName}
+            Log {row.label} — {row.subjectName}
           </DialogTitle>
         </DialogHeader>
         <VaccinationQuickAdd
-          kittenId={row.kittenId}
+          subjectType={row.subjectType}
+          subjectId={row.subjectId}
           templates={templates}
+          types={types}
           defaultType={row.vaccineType}
           onAdded={() => setOpen(false)}
         />
@@ -52,11 +68,13 @@ function LogDialog({ row, templates }: { row: MedicalDueRow; templates: Schedule
 
 export function DashboardMedical({
   rows,
-  templates,
+  kittenTemplates,
+  motherTemplates,
   todayIso,
 }: {
   rows: MedicalDueRow[];
-  templates: ScheduleTemplate[];
+  kittenTemplates: ScheduleTemplate[];
+  motherTemplates: ScheduleTemplate[];
   todayIso: string;
 }) {
   // Overdue first, then soonest due.
@@ -64,7 +82,7 @@ export function DashboardMedical({
     (a, b) =>
       Number(b.overdue) - Number(a.overdue) ||
       a.dueDateIso.localeCompare(b.dueDateIso) ||
-      a.kittenName.localeCompare(b.kittenName),
+      a.subjectName.localeCompare(b.subjectName),
   );
 
   if (sorted.length === 0) {
@@ -79,9 +97,10 @@ export function DashboardMedical({
     <div className="flex flex-col gap-2">
       {sorted.map((row) => {
         const days = daysUntil(row.dueDateIso, todayIso);
+        const href = row.subjectType === "mother" ? `/mothers/${row.subjectId}` : `/kittens/${row.subjectId}`;
         return (
           <div
-            key={`${row.kittenId}-${row.vaccineType}`}
+            key={`${row.subjectType}-${row.subjectId}-${row.vaccineType}`}
             className={
               row.overdue
                 ? "flex items-center justify-between gap-3 rounded-lg border border-red-200 bg-red-50 p-3"
@@ -89,9 +108,16 @@ export function DashboardMedical({
             }
           >
             <div className="min-w-0">
-              <Link href={`/kittens/${row.kittenId}`} className="font-medium hover:underline">
-                {row.kittenName}
-              </Link>
+              <span className="flex items-center gap-2">
+                <Link href={href} className="font-medium hover:underline">
+                  {row.subjectName}
+                </Link>
+                {row.subjectType === "mother" ? (
+                  <span className="bg-muted text-muted-foreground rounded-full px-1.5 py-0.5 text-[10px] font-medium uppercase">
+                    Mother
+                  </span>
+                ) : null}
+              </span>
               <p
                 className={
                   row.overdue
@@ -110,7 +136,10 @@ export function DashboardMedical({
                   : `due ${formatDate(row.dueDateIso)}`}
               </p>
             </div>
-            <LogDialog row={row} templates={templates} />
+            <LogDialog
+              row={row}
+              templates={row.subjectType === "mother" ? motherTemplates : kittenTemplates}
+            />
           </div>
         );
       })}

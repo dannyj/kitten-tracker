@@ -9,7 +9,8 @@ export const metadata = { title: "Settings — Kitten Tracker" };
 export default async function SettingsPage() {
   const user = await requireUser();
   const settings = getAlertSettings();
-  const templates = getScheduleTemplates();
+  const kittenTemplates = getScheduleTemplates("kitten");
+  const motherTemplates = getScheduleTemplates("mother");
 
   if (user.role !== "admin") {
     return (
@@ -43,14 +44,18 @@ export default async function SettingsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Vaccination & deworming schedule templates</CardTitle>
+          <CardTitle className="text-base">Treatment schedule templates</CardTitle>
           <CardDescription>
             General guidance defaults used to suggest due dates — not a veterinary protocol. The
-            shelter&apos;s and vet&apos;s actual schedule takes precedence. Ages are in weeks.
+            shelter&apos;s and vet&apos;s actual schedule takes precedence. Kitten and adult-cat
+            templates are independent. Ages/intervals are in weeks.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <ScheduleTemplatesForm templates={templates} />
+          <ScheduleTemplatesForm
+            kittenTemplates={kittenTemplates}
+            motherTemplates={motherTemplates}
+          />
         </CardContent>
       </Card>
     </div>

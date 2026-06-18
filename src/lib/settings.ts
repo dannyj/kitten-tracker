@@ -1,10 +1,10 @@
 import "server-only";
 
-import { asc } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { alertSettings, scheduleTemplates } from "@/db/schema";
 import { DEFAULT_ALERT_SETTINGS, type AlertSettings } from "@/lib/alerts";
-import type { ScheduleTemplate } from "@/lib/schedule";
+import type { MedicalSubjectType, ScheduleTemplate } from "@/lib/schedule";
 
 /** Maps alert_settings DB keys to the typed AlertSettings fields. */
 export const ALERT_SETTING_KEYS = {
@@ -36,17 +36,22 @@ export function getAlertSettings(): AlertSettings {
   };
 }
 
-/** Schedule templates live from the DB (seeded defaults in migrate.ts). */
-export function getScheduleTemplates(): ScheduleTemplate[] {
-  return db
+/**
+ * Schedule templates live from the DB (seeded defaults in migrate.ts). Pass a
+ * subject to get just that subject's templates (kitten vs adult-cat differ).
+ */
+export function getScheduleTemplates(subjectType?: MedicalSubjectType): ScheduleTemplate[] {
+  const base = db
     .select({
+      subjectType: scheduleTemplates.subjectType,
       vaccineType: scheduleTemplates.vaccineType,
       label: scheduleTemplates.label,
       firstWeeks: scheduleTemplates.firstWeeks,
       everyWeeks: scheduleTemplates.everyWeeks,
       untilWeeks: scheduleTemplates.untilWeeks,
     })
-    .from(scheduleTemplates)
+    .from(scheduleTemplates);
+  return (subjectType ? base.where(eq(scheduleTemplates.subjectType, subjectType)) : base)
     .orderBy(asc(scheduleTemplates.id))
     .all();
 }

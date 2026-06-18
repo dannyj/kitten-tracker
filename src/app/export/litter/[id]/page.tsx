@@ -4,7 +4,7 @@ import { audit } from "@/lib/audit";
 import { requireUser } from "@/lib/auth/guard";
 import { todayIso } from "@/lib/dates";
 import { getLitterExport } from "@/lib/export-data";
-import { ExportDisclaimer, ExportHeader, KittenSummary } from "../../export-view";
+import { ExportDisclaimer, ExportHeader, KittenSummary, MotherSummary } from "../../export-view";
 
 export const metadata = { title: "Litter medical summary — Kitten Tracker" };
 
@@ -50,15 +50,16 @@ export default async function LitterExportPage({
         selfHref={`/export/litter/${data.litterId}`}
         pdfHref={`/export/litter/${data.litterId}/pdf`}
       />
-      {data.kittens.length === 0 ? (
-        <p className="text-muted-foreground text-sm">No kittens in this litter.</p>
-      ) : (
-        <div className="flex flex-col gap-4">
-          {data.kittens.map((k) => (
+      <div className="flex flex-col gap-4">
+        {data.mother ? <MotherSummary m={data.mother} /> : null}
+        {data.kittens.length === 0 ? (
+          <p className="text-muted-foreground text-sm">No kittens in this litter.</p>
+        ) : (
+          data.kittens.map((k) => (
             <KittenSummary key={k.id} k={k} includesAdopter={includesAdopter} />
-          ))}
-        </div>
-      )}
+          ))
+        )}
+      </div>
       <ExportDisclaimer />
     </div>
   );

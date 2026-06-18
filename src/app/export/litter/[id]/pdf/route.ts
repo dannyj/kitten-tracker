@@ -27,7 +27,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     audit("adopter_pii.access", { username: user.username, detail: `litter pdf id=${id}` });
   }
 
-  const pdf = await litterPdf(data.title, data.kittens, {
+  const pdf = await litterPdf(data.title, data.mother, data.kittens, {
     generatedAtIso: todayIso(),
     fosterName: user.username,
     includesAdopter,

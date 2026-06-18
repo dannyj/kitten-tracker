@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/db";
-import { kittens, vaccinations } from "@/db/schema";
+import { kittens, MEDICAL_SUBJECT_TYPES, mothers, vaccinations } from "@/db/schema";
 import { requireUser } from "@/lib/auth/guard";
 import { VACCINATION_EDIT_WINDOW_MS } from "@/lib/constants";
 import { todayIso } from "@/lib/dates";
@@ -45,13 +45,24 @@ function payload(data: z.infer<typeof baseFields>) {
   };
 }
 
-function revalidateVaccination(kittenId: number) {
-  revalidatePath(`/kittens/${kittenId}`);
+const subject = z.object({
+  subjectType: z.enum(MEDICAL_SUBJECT_TYPES),
+  subjectId: z.coerce.number().int().positive(),
+});
+type Subject = z.infer<typeof subject>;
+
+/** Confirms the medical record's subject (kitten or mother) actually exists. */
+function subjectExists({ subjectType, subjectId }: Subject): boolean {
+  const table = subjectType === "kitten" ? kittens : mothers;
+  return db.select({ id: table.id }).from(table).where(eq(table.id, subjectId)).get() !== undefined;
+}
+
+function revalidateMedical({ subjectType, subjectId }: Subject) {
+  revalidatePath(`/${subjectType === "kitten" ? "kittens" : "mothers"}/${subjectId}`);
   revalidatePath("/"); // dashboard medical-due panel
 }
 
-const addSchema = z.object({
-  kittenId: z.coerce.number().int().positive(),
+const addSchema = subject.extend({
   // Set when this entry corrects a locked one (append-only correction).
   correctsId: z.coerce.number().int().positive().optional(),
 });
@@ -63,8 +74,8 @@ export async function addVaccination(_prev: FormState, formData: FormData): Prom
   const result = validate(formData);
   if (!result.ok) return { error: result.error, values: formValues(formData) };
 
-  const kitten = db.select().from(kittens).where(eq(kittens.id, meta.data.kittenId)).get();
-  if (!kitten) return { error: "Kitten not found" };
+  const subj: Subject = { subjectType: meta.data.subjectType, subjectId: meta.data.subjectId };
+  if (!subjectExists(subj)) return { error: "Subject not found" };
 
   let correctsId: number | null = null;
   if (meta.data.correctsId) {
@@ -73,16 +84,20 @@ export async function addVaccination(_prev: FormState, formData: FormData): Prom
       .from(vaccinations)
       .where(eq(vaccinations.id, meta.data.correctsId))
       .get();
-    if (!original || original.kittenId !== kitten.id) {
+    if (
+      !original ||
+      original.subjectType !== subj.subjectType ||
+      original.subjectId !== subj.subjectId
+    ) {
       return { error: "Entry being corrected not found" };
     }
     correctsId = original.id;
   }
 
   db.insert(vaccinations)
-    .values({ kittenId: kitten.id, correctsId, ...payload(result.data) })
+    .values({ ...subj, correctsId, ...payload(result.data) })
     .run();
-  revalidateVaccination(kitten.id);
+  revalidateMedical(subj);
   return null;
 }
 
@@ -99,7 +114,7 @@ export async function updateVaccination(_prev: FormState, formData: FormData): P
   if (!result.ok) return { error: result.error, values: formValues(formData) };
 
   db.update(vaccinations).set(payload(result.data)).where(eq(vaccinations.id, id.data)).run();
-  revalidateVaccination(entry.kittenId);
+  revalidateMedical({ subjectType: entry.subjectType, subjectId: entry.subjectId });
   return null;
 }
 
@@ -118,6 +133,6 @@ export async function deleteVaccination(_prev: FormState, formData: FormData): P
     .where(eq(vaccinations.correctsId, id.data))
     .run();
   db.delete(vaccinations).where(eq(vaccinations.id, id.data)).run();
-  revalidateVaccination(entry.kittenId);
+  revalidateMedical({ subjectType: entry.subjectType, subjectId: entry.subjectId });
   return null;
 }

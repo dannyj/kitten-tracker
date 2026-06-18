@@ -1,5 +1,5 @@
-import { asc, desc, eq, inArray } from "drizzle-orm";
-import { Camera, Pencil, Plus } from "lucide-react";
+import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { Camera, Pencil, Pill, Plus } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { z } from "zod";
@@ -9,13 +9,16 @@ import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { db } from "@/db";
-import { kittens, litters, motherHealthLogs, mothers } from "@/db/schema";
+import { kittens, litters, motherHealthLogs, mothers, vaccinations } from "@/db/schema";
 import { requireUser } from "@/lib/auth/guard";
-import { formatAge, formatDate } from "@/lib/dates";
+import { formatAge, formatDate, todayIso } from "@/lib/dates";
+import { motherDueItems } from "@/lib/medical-data";
 import { getSubjectPhotos } from "@/lib/photo-data";
-import { getAlertSettings } from "@/lib/settings";
+import { MOTHER_VACCINE_TYPES } from "@/lib/schedule";
+import { getAlertSettings, getScheduleTemplates } from "@/lib/settings";
 import { ACTIVE_STATUSES } from "@/lib/status";
 import { alertsByKitten } from "@/lib/weight-data";
+import { MedicalCard, type VaccinationRow } from "../../kittens/[id]/medical-card";
 import { HealthLog } from "./health-log";
 
 const MOTHER_STATUS_LABELS: Record<string, string> = {
@@ -66,6 +69,30 @@ export default async function MotherDetailPage({ params }: { params: Promise<{ i
     .where(eq(motherHealthLogs.motherId, mother.id))
     .orderBy(desc(motherHealthLogs.loggedAt), desc(motherHealthLogs.id))
     .all();
+
+  // Structured medical records (microchip, deworming, flea, vaccinations) —
+  // newest-first, with the adult-cat schedule templates and record-driven
+  // upcoming/overdue timeline.
+  const motherTemplates = getScheduleTemplates("mother");
+  const medicalRaw = db
+    .select()
+    .from(vaccinations)
+    .where(and(eq(vaccinations.subjectType, "mother"), eq(vaccinations.subjectId, mother.id)))
+    .orderBy(desc(vaccinations.givenAt), desc(vaccinations.id))
+    .all();
+  const medicalGivenAtById = new Map(medicalRaw.map((v) => [v.id, v.givenAt]));
+  const medicalRows: VaccinationRow[] = medicalRaw.map((v) => ({
+    id: v.id,
+    type: v.type,
+    givenAtIso: v.givenAt,
+    batchNumber: v.batchNumber,
+    administeredBy: v.administeredBy,
+    nextDueDateIso: v.nextDueDate,
+    note: v.note,
+    correctsOfDateIso: v.correctsId ? (medicalGivenAtById.get(v.correctsId) ?? null) : null,
+    createdAtMs: v.createdAt.getTime(),
+  }));
+  const medicalDue = motherDueItems(mother.id, motherTemplates, todayIso());
 
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-6">
@@ -175,22 +202,57 @@ export default async function MotherDetailPage({ params }: { params: Promise<{ i
           </Card>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Health log</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <HealthLog
-              motherId={mother.id}
-              logs={logs.map((log) => ({
-                id: log.id,
-                category: log.category,
-                entry: log.entry,
-                loggedAtMs: log.loggedAt.getTime(),
-              }))}
-            />
-          </CardContent>
-        </Card>
+        <div className="flex flex-col gap-6">
+          <Card id="medical" className="scroll-mt-20">
+            <CardHeader className="flex flex-row items-center justify-between gap-2">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Pill className="size-4" aria-hidden /> Medical records
+              </CardTitle>
+              <Button asChild size="sm" variant="outline">
+                <Link href={`/export/mother/${mother.id}`}>Export</Link>
+              </Button>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-4">
+              <p className="text-muted-foreground text-sm">
+                Discrete treatments with dates and batch/chip numbers — distinct from the
+                observational health log below.
+              </p>
+              <MedicalCard
+                subjectType="mother"
+                subjectId={mother.id}
+                templates={motherTemplates}
+                types={MOTHER_VACCINE_TYPES}
+                rows={medicalRows}
+                dueItems={medicalDue}
+              />
+              {medicalRows.length > 0 ? (
+                <Link
+                  href={`/mothers/${mother.id}/medical`}
+                  className="text-muted-foreground self-start text-xs underline underline-offset-2"
+                >
+                  Manage entries
+                </Link>
+              ) : null}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Health log</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <HealthLog
+                motherId={mother.id}
+                logs={logs.map((log) => ({
+                  id: log.id,
+                  category: log.category,
+                  entry: log.entry,
+                  loggedAtMs: log.loggedAt.getTime(),
+                }))}
+              />
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   );

@@ -10,6 +10,7 @@ export type AuditAction =
   | "logout"
   | "export.kitten"
   | "export.litter"
+  | "export.mother"
   | "adopter_pii.access";
 
 /**

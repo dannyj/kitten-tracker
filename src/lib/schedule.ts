@@ -7,7 +7,10 @@
  * what looks due; it never decides what a kitten should receive.
  */
 
+export type MedicalSubjectType = "kitten" | "mother";
+
 export type ScheduleTemplate = {
+  subjectType: MedicalSubjectType;
   vaccineType: string;
   label: string;
   firstWeeks: number;
@@ -16,13 +19,14 @@ export type ScheduleTemplate = {
 };
 
 /**
- * Seeded defaults — convenience values reflecting commonly cited kitten timing,
- * NOT a vet protocol. Shared by the migration seed and the settings "reset".
+ * Seeded kitten defaults — convenience values reflecting commonly cited kitten
+ * timing, NOT a vet protocol. Driven from birth date (first/every/until weeks).
  */
-export const DEFAULT_SCHEDULE_TEMPLATES: ScheduleTemplate[] = [
-  { vaccineType: "FVRCP", label: "FVRCP", firstWeeks: 7, everyWeeks: 3, untilWeeks: 16 },
-  { vaccineType: "deworming", label: "Deworming", firstWeeks: 2, everyWeeks: 2, untilWeeks: 8 },
+export const DEFAULT_KITTEN_SCHEDULE_TEMPLATES: ScheduleTemplate[] = [
+  { subjectType: "kitten", vaccineType: "FVRCP", label: "FVRCP", firstWeeks: 7, everyWeeks: 3, untilWeeks: 16 },
+  { subjectType: "kitten", vaccineType: "deworming", label: "Deworming", firstWeeks: 2, everyWeeks: 2, untilWeeks: 8 },
   {
+    subjectType: "kitten",
     vaccineType: "flea treatment",
     label: "Flea treatment",
     firstWeeks: 8,
@@ -31,11 +35,46 @@ export const DEFAULT_SCHEDULE_TEMPLATES: ScheduleTemplate[] = [
   },
 ];
 
-/** Selectable vaccination/medical types; "other" allows free text. */
+/**
+ * Seeded adult-cat (mother) defaults — convenience intervals reflecting commonly
+ * cited adult-cat care timing, NOT a vet protocol. Adults have no birth-based
+ * milestone schedule, so only `everyWeeks` is meaningful: it prefills the
+ * next-due when a treatment is logged. `everyWeeks: 0` means one-off / not
+ * routinely recurring (microchip is a one-off; rabies isn't routine for
+ * indoor-only NL cats; FeLV is recorded as status), so nothing is auto-due.
+ */
+export const DEFAULT_MOTHER_SCHEDULE_TEMPLATES: ScheduleTemplate[] = [
+  { subjectType: "mother", vaccineType: "microchip", label: "Microchip", firstWeeks: 0, everyWeeks: 0, untilWeeks: 0 },
+  { subjectType: "mother", vaccineType: "deworming", label: "Deworming", firstWeeks: 0, everyWeeks: 13, untilWeeks: 0 },
+  { subjectType: "mother", vaccineType: "flea treatment", label: "Flea treatment", firstWeeks: 0, everyWeeks: 4, untilWeeks: 0 },
+  { subjectType: "mother", vaccineType: "FVRCP", label: "FVRCP", firstWeeks: 0, everyWeeks: 52, untilWeeks: 0 },
+  { subjectType: "mother", vaccineType: "rabies", label: "Rabies", firstWeeks: 0, everyWeeks: 0, untilWeeks: 0 },
+  { subjectType: "mother", vaccineType: "FeLV", label: "FeLV", firstWeeks: 0, everyWeeks: 0, untilWeeks: 0 },
+];
+
+/** All seeded defaults across both subjects (migration seed + settings reset). */
+export const DEFAULT_SCHEDULE_TEMPLATES: ScheduleTemplate[] = [
+  ...DEFAULT_KITTEN_SCHEDULE_TEMPLATES,
+  ...DEFAULT_MOTHER_SCHEDULE_TEMPLATES,
+];
+
+/** Selectable kitten medical types; "other" allows free text. */
 export const VACCINE_TYPES = [
   "FVRCP",
   "deworming",
   "flea treatment",
+  "rabies",
+  "FeLV",
+  "vet check",
+  "other",
+] as const;
+
+/** Selectable adult-cat (mother) medical types; "other" allows free text. */
+export const MOTHER_VACCINE_TYPES = [
+  "microchip",
+  "deworming",
+  "flea treatment",
+  "FVRCP",
   "rabies",
   "FeLV",
   "vet check",

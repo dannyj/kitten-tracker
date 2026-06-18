@@ -1,8 +1,17 @@
 import "server-only";
 
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { adopters, kittens, litters, mothers, vaccinations, weightEntries } from "@/db/schema";
+import {
+  adopters,
+  kittens,
+  litters,
+  motherHealthLogs,
+  mothers,
+  type MedicalSubjectType,
+  vaccinations,
+  weightEntries,
+} from "@/db/schema";
 import { formatAge } from "@/lib/dates";
 import { buildKittenGrowthSeries, type GrowthChartPoint } from "@/lib/growth";
 import { getAlertSettings } from "@/lib/settings";
@@ -17,6 +26,8 @@ export type ExportVaccination = {
   note: string | null;
   correctsOfDateIso: string | null;
 };
+
+export type ExportHealthNote = { dateIso: string; category: string; entry: string };
 
 export type ExportGrowth = {
   birthWeightG: number;
@@ -82,11 +93,11 @@ function buildGrowth(kittenId: number): ExportGrowth | null {
   };
 }
 
-function buildVaccinations(kittenId: number): ExportVaccination[] {
+function buildMedical(subjectType: MedicalSubjectType, subjectId: number): ExportVaccination[] {
   const rows = db
     .select()
     .from(vaccinations)
-    .where(eq(vaccinations.kittenId, kittenId))
+    .where(and(eq(vaccinations.subjectType, subjectType), eq(vaccinations.subjectId, subjectId)))
     .orderBy(asc(vaccinations.givenAt), asc(vaccinations.id))
     .all();
   const givenAtById = new Map(rows.map((r) => [r.id, r.givenAt]));
@@ -157,7 +168,7 @@ function buildKitten(kitten: typeof kittens.$inferSelect, includeAdopter: boolea
     birthDateEstimated: kitten.birthDateEstimated,
     ageText: formatAge(kitten.birthDate, { estimated: kitten.birthDateEstimated }),
     statusLabel: STATUS_LABELS[kitten.status],
-    vaccinations: buildVaccinations(kitten.id),
+    vaccinations: buildMedical("kitten", kitten.id),
     growth: buildGrowth(kitten.id),
     weights,
     growthSeries: series,
@@ -171,10 +182,62 @@ export function getKittenExport(kittenId: number, includeAdopter: boolean): Kitt
   return buildKitten(kitten, includeAdopter);
 }
 
+const MOTHER_STATUS_LABELS: Record<string, string> = {
+  in_care: "In care",
+  returned: "Returned to shelter",
+  deceased: "Deceased",
+};
+
+export type MotherExport = {
+  id: number;
+  name: string;
+  shelterNumber: string | null;
+  intakeDateIso: string | null;
+  statusLabel: string;
+  /** Structured treatment history (shared code path with kittens). */
+  vaccinations: ExportVaccination[];
+  /** Free-text health-log observations, newest-first. */
+  healthNotes: ExportHealthNote[];
+};
+
+function buildHealthNotes(motherId: number): ExportHealthNote[] {
+  return db
+    .select()
+    .from(motherHealthLogs)
+    .where(eq(motherHealthLogs.motherId, motherId))
+    .orderBy(asc(motherHealthLogs.loggedAt), asc(motherHealthLogs.id))
+    .all()
+    .map((l) => ({
+      dateIso: isoDate(l.loggedAt),
+      category: l.category,
+      entry: l.entry,
+    }));
+}
+
+function buildMother(mother: typeof mothers.$inferSelect): MotherExport {
+  return {
+    id: mother.id,
+    name: mother.name,
+    shelterNumber: mother.shelterNumber,
+    intakeDateIso: mother.intakeDate,
+    statusLabel: MOTHER_STATUS_LABELS[mother.status] ?? mother.status,
+    // The mother has no growth chart (kitten-specific) — just medical + notes.
+    vaccinations: buildMedical("mother", mother.id),
+    healthNotes: buildHealthNotes(mother.id),
+  };
+}
+
+export function getMotherExport(motherId: number): MotherExport | null {
+  const mother = db.select().from(mothers).where(eq(mothers.id, motherId)).get();
+  if (!mother) return null;
+  return buildMother(mother);
+}
+
 export type LitterExport = {
   litterId: number;
   title: string;
   birthDateIso: string | null;
+  mother: MotherExport | null;
   kittens: KittenExport[];
 };
 
@@ -194,6 +257,7 @@ export function getLitterExport(litterId: number, includeAdopter: boolean): Litt
     litterId,
     title: mother ? `${mother.name}'s litter` : "Orphan litter",
     birthDateIso: litter.birthDate,
+    mother: mother ? buildMother(mother) : null,
     kittens: litterKittens.map((k) => buildKitten(k, includeAdopter)),
   };
 }
