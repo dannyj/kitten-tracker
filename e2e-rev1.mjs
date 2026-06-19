@@ -56,6 +56,16 @@ try {
   await page.waitForSelector("li:has-text('205 g')");
   const inlineEditOnDetail = await page.locator("li:has-text('205 g') button:has-text('Edit')").count();
   check("Item 3: no inline edit/delete on detail weights", inlineEditOnDetail === 0);
+
+  // ---- Enhancement: instant gain/loss + verdict after a quick-add ----
+  const feedback = page.locator('[role=status]').filter({ hasText: /since the last weigh|First weight recorded/ });
+  await feedback.first().waitFor();
+  const feedbackText = await feedback.first().textContent();
+  check(
+    "Weigh feedback: quick-add shows gain/loss + verdict",
+    /205 g/.test(feedbackText) && /(On track|Be aware|Keep weighing)/.test(feedbackText),
+    feedbackText?.trim(),
+  );
   void weightsCard;
   // go to manage view; the fresh entry should be editable
   await page.locator("a:has-text('Manage entries')").first().click();

@@ -6,8 +6,11 @@ import { z } from "zod";
 import { db } from "@/db";
 import { kittens, weightEntries } from "@/db/schema";
 import { requireUser } from "@/lib/auth/guard";
+import type { WeighFeedback } from "@/lib/alerts";
 import { WEIGHT_EDIT_WINDOW_MS, WEIGHT_MAX_G, WEIGHT_MIN_G } from "@/lib/constants";
 import { formValues, type FormState } from "@/lib/forms";
+import { getAlertSettings } from "@/lib/settings";
+import { weighFeedback } from "@/lib/weight-data";
 
 // The client pins the datetime-local value to an absolute ISO instant (with
 // timezone) before submitting, so new Date() parses it the same regardless of
@@ -42,7 +45,16 @@ function revalidateKitten(kittenId: number, litterId?: number) {
   if (litterId) revalidatePath(`/litters/${litterId}`);
 }
 
-export async function addWeight(_prev: FormState, formData: FormData): Promise<FormState> {
+/** Success carries the instant feedback; failure mirrors {@link FormState}. */
+export type AddWeightState =
+  | { error: string; values?: Record<string, string> }
+  | { feedback: WeighFeedback }
+  | null;
+
+export async function addWeight(
+  _prev: AddWeightState,
+  formData: FormData,
+): Promise<AddWeightState> {
   await requireUser();
   const parsed = addWeightSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) {
@@ -51,7 +63,8 @@ export async function addWeight(_prev: FormState, formData: FormData): Promise<F
   const kitten = db.select().from(kittens).where(eq(kittens.id, parsed.data.kittenId)).get();
   if (!kitten) return { error: "Kitten not found" };
 
-  db.insert(weightEntries)
+  const inserted = db
+    .insert(weightEntries)
     .values({
       kittenId: parsed.data.kittenId,
       weighedAt: parsed.data.weighedAt,
@@ -60,7 +73,8 @@ export async function addWeight(_prev: FormState, formData: FormData): Promise<F
     })
     .run();
   revalidateKitten(kitten.id, kitten.litterId);
-  return null;
+  const feedback = weighFeedback(kitten.id, Number(inserted.lastInsertRowid), getAlertSettings());
+  return feedback ? { feedback } : null;
 }
 
 export type BulkWeighState = {
@@ -71,6 +85,8 @@ export type BulkWeighState = {
   savedKittenIds?: number[];
   /** Per-kitten validation failures, keyed so the form can flag the right row. */
   failures?: { kittenId: number; message: string }[];
+  /** Instant gain/loss + verdict per saved kitten, for the summary screen. */
+  feedback?: ({ kittenId: number } & WeighFeedback)[];
 } | null;
 
 /**
@@ -122,12 +138,14 @@ export async function addWeights(
   );
 
   const savedKittenIds: number[] = [];
+  const savedEntries: { kittenId: number; entryId: number }[] = [];
   for (const row of toInsert) {
     if (!found.has(row.kittenId)) {
       failures.push({ kittenId: row.kittenId, message: "Kitten not found" });
       continue;
     }
-    db.insert(weightEntries)
+    const inserted = db
+      .insert(weightEntries)
       .values({
         kittenId: row.kittenId,
         weighedAt: when.data,
@@ -137,13 +155,20 @@ export async function addWeights(
       .run();
     revalidatePath(`/kittens/${row.kittenId}`);
     savedKittenIds.push(row.kittenId);
+    savedEntries.push({ kittenId: row.kittenId, entryId: Number(inserted.lastInsertRowid) });
   }
 
   revalidatePath("/kittens");
   revalidatePath("/alerts");
   if (litterId.success) revalidatePath(`/litters/${litterId.data}`);
 
-  return { saved: savedKittenIds.length, savedKittenIds, failures };
+  const settings = getAlertSettings();
+  const feedback = savedEntries.flatMap(({ kittenId, entryId }) => {
+    const fb = weighFeedback(kittenId, entryId, settings);
+    return fb ? [{ kittenId, ...fb }] : [];
+  });
+
+  return { saved: savedKittenIds.length, savedKittenIds, failures, feedback };
 }
 
 const updateWeightSchema = z.object({

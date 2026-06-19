@@ -86,6 +86,15 @@ try {
   await page.click("button:has-text('Save all weights')");
   await page.waitForSelector("text=Weigh-in saved");
   check("AC1: litter weigh-in records all siblings at once", inputCount === 4, `inputs: ${inputCount}`);
+  // Enhancement: the summary shows a per-kitten gain/loss + verdict for each saved weight.
+  const litterFeedback = page
+    .locator('[role=status]')
+    .filter({ hasText: /(On track|Be aware|Keep weighing)/ });
+  check(
+    "AC1: litter weigh-in summary shows per-kitten gain/loss + verdict",
+    (await litterFeedback.count()) === inputCount,
+    `feedback rows: ${await litterFeedback.count()}`,
+  );
 
   // ---- AC2: per-kitten chart + trend matches hand calc ----
   const okkieHref = await kittenIdByName("Okkie");

@@ -5,6 +5,7 @@ import { useActionState, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { WeighResult } from "@/components/weigh-result";
 import {
   WEIGHT_EDIT_WINDOW_MS,
   WEIGHT_MAX_G,
@@ -15,7 +16,7 @@ import {
 import { formatDateTime, pinDatetimeField, toDatetimeLocal } from "@/lib/dates";
 import type { FormState } from "@/lib/forms";
 import { useNow } from "@/lib/use-now";
-import { addWeight, deleteWeight, updateWeight } from "../weight-actions";
+import { addWeight, type AddWeightState, deleteWeight, updateWeight } from "../weight-actions";
 
 export type WeightRow = {
   id: number;
@@ -36,10 +37,11 @@ function softConfirm(grams: number): boolean {
 
 function QuickAdd({ kittenId }: { kittenId: number }) {
   const formRef = useRef<HTMLFormElement>(null);
-  const [state, formAction, pending] = useActionState<FormState, FormData>(
+  const [state, formAction, pending] = useActionState<AddWeightState, FormData>(
     async (prev, formData) => {
       const result = await addWeight(prev, formData);
-      if (!result) {
+      // Saved cleanly (feedback present, or no history to feed back) → clear the form.
+      if (!result || "feedback" in result) {
         formRef.current?.reset();
         initTimestamp(formRef.current?.elements.namedItem("weighedAt") ?? null);
       }
@@ -47,6 +49,8 @@ function QuickAdd({ kittenId }: { kittenId: number }) {
     },
     null,
   );
+
+  const error = state && "error" in state ? state : null;
 
   function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -73,7 +77,7 @@ function QuickAdd({ kittenId }: { kittenId: number }) {
             required
             autoFocus
             placeholder="e.g. 215"
-            defaultValue={state?.values?.weightGrams ?? ""}
+            defaultValue={error?.values?.weightGrams ?? ""}
           />
         </div>
         <div className="flex flex-1 flex-col gap-1.5">
@@ -94,14 +98,15 @@ function QuickAdd({ kittenId }: { kittenId: number }) {
           name="note"
           maxLength={500}
           placeholder="before feed, after feed…"
-          defaultValue={state?.values?.note ?? ""}
+          defaultValue={error?.values?.note ?? ""}
         />
       </div>
-      {state?.error ? (
+      {error ? (
         <p role="alert" className="text-destructive text-sm">
-          {state.error}
+          {error.error}
         </p>
       ) : null}
+      {state && "feedback" in state ? <WeighResult feedback={state.feedback} /> : null}
       <div>
         <Button type="submit" disabled={pending}>
           {pending ? "Saving…" : "Add weight"}

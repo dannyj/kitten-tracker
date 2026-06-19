@@ -184,3 +184,45 @@ export const ALERT_META: Record<AlertLevel, { label: string; emoji: string; badg
   };
 
 export const TREND_ARROW: Record<Trend, string> = { up: "↑", flat: "→", down: "↓" };
+
+/**
+ * Instant post-weigh feedback: the gain/loss versus the previous weighing plus
+ * the engine's verdict, so a weigh-in gives an immediate read without leaving
+ * the form. `deltaGrams` is null for a kitten's very first weight.
+ */
+export type WeighFeedback = {
+  weightGrams: number;
+  deltaGrams: number | null;
+  alert: AlertResult;
+};
+
+export type FeedbackTone = "good" | "caution" | "neutral";
+
+/**
+ * Collapse the four alert levels into the two-tier tone used for the instant
+ * feedback: a clear "on track" vs "be aware", with a neutral fallback while
+ * there isn't yet enough history to judge.
+ */
+export function feedbackTone(level: AlertLevel): FeedbackTone {
+  if (level === "ok") return "good";
+  if (level === "warning" || level === "urgent") return "caution";
+  return "neutral";
+}
+
+export const FEEDBACK_META: Record<FeedbackTone, { label: string; emoji: string; class: string }> = {
+  good: {
+    label: "On track",
+    emoji: "✅",
+    class: "border-emerald-200 bg-emerald-50 text-emerald-900",
+  },
+  caution: {
+    label: "Be aware",
+    emoji: "⚠️",
+    class: "border-amber-200 bg-amber-50 text-amber-900",
+  },
+  neutral: {
+    label: "Keep weighing",
+    emoji: "ⓘ",
+    class: "border-zinc-200 bg-zinc-50 text-zinc-700",
+  },
+};
