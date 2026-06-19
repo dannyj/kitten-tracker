@@ -1,5 +1,15 @@
 import { and, asc, desc, eq } from "drizzle-orm";
-import { Camera, Cat, LineChart, Milk, Pencil, Pill, Scale, UtensilsCrossed } from "lucide-react";
+import {
+  CalendarPlus,
+  Camera,
+  Cat,
+  LineChart,
+  Milk,
+  Pencil,
+  Pill,
+  Scale,
+  UtensilsCrossed,
+} from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -200,11 +210,20 @@ export default async function KittenDetailPage({ params }: { params: Promise<{ i
             </p>
           </div>
         </div>
-        <Button asChild variant="outline" size="sm">
-          <Link href={`/kittens/${kitten.id}/edit`}>
-            <Pencil className="size-4" aria-hidden /> Edit
-          </Link>
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          {isActive ? (
+            <Button asChild variant="outline" size="sm">
+              <Link href={`/viewings/new?kitten=${kitten.id}`}>
+                <CalendarPlus className="size-4" aria-hidden /> Book viewing
+              </Link>
+            </Button>
+          ) : null}
+          <Button asChild variant="outline" size="sm">
+            <Link href={`/kittens/${kitten.id}/edit`}>
+              <Pencil className="size-4" aria-hidden /> Edit
+            </Link>
+          </Button>
+        </div>
       </div>
 
       {alert && (alert.level === "warning" || alert.level === "urgent") ? (

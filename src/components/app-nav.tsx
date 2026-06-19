@@ -1,12 +1,13 @@
 "use client";
 
 import {
+  CalendarDays,
   Cat,
+  Contact,
   Heart,
   LayoutDashboard,
   Settings,
   TriangleAlert,
-  Users,
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
@@ -20,7 +21,8 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/alerts", label: "Alerts", icon: TriangleAlert },
   { href: "/kittens", label: "Kittens", icon: Cat },
   { href: "/mothers", label: "Mothers", icon: Heart },
-  { href: "/viewings", label: "Viewings", icon: Users },
+  { href: "/parties", label: "Parties", icon: Contact },
+  { href: "/viewings", label: "Viewings", icon: CalendarDays },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 

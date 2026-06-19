@@ -124,6 +124,7 @@ Because of the step-1 architecture (app behind NPM, no published port), exposure
 - Sessions: random 256-bit token in an httpOnly/secure/sameSite=lax cookie; only an HMAC of the token is stored. 30-day lifetime, sliding renewal.
 - Login rate-limited (5 / 15 min per IP); attempts recorded in the audit log.
 - Every mutation Zod-validated; Drizzle only (no raw SQL). Authorization checked server-side on every action; adopter PII and Settings are admin-only.
+- Interested-party contact details are PII and admin-only (omitted server-side for viewers, not just hidden in the UI). These are people who may never adopt — the Parties list carries an on-screen reminder to **prune parties who didn't proceed** rather than retaining contact data indefinitely without reason. Parties are excluded from the vet export.
 - Upload pipeline: magic-byte content sniffing (not extension/MIME), 15 MB cap, **always re-encoded** with sharp to WebP (neutralises embedded payloads, strips EXIF **and GPS**), UUID filenames outside any static path, served only through an authenticated route with a path-traversal guard.
 - Headers: nonce-based CSP (no `unsafe-inline` scripts) in `src/proxy.ts`; `X-Content-Type-Options`, `Referrer-Policy`, `X-Frame-Options: DENY`, `Permissions-Policy` in `next.config.ts`. HSTS ready to enable.
 - Production errors show a clean message — no stack traces leak to the client.

@@ -5,7 +5,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db } from "@/db";
-import { adopters, kittens, KITTEN_STATUSES, litters, statusHistory } from "@/db/schema";
+import { kittens, KITTEN_STATUSES, litters, statusHistory } from "@/db/schema";
+import { adopterSchema, markKittenAdopted } from "@/lib/adoption";
 import { requireAdmin, requireUser } from "@/lib/auth/guard";
 import { formValues, type FormState } from "@/lib/forms";
 import { isForwardTransition } from "@/lib/status";
@@ -124,24 +125,6 @@ const baseStatusChange = z.object({
   note: z.string().trim().max(2000).optional().or(z.literal("")),
 });
 
-// Light phone validation per the handoff: accept +31/06 styles, don't force a mask.
-const phoneSchema = z
-  .string()
-  .trim()
-  .regex(/^[+0-9][0-9 ()/-]{4,24}$/, "That doesn't look like a phone number")
-  .optional()
-  .or(z.literal(""));
-
-const adopterSchema = z.object({
-  adopterName: z.string().trim().min(1, "Adopter name is required").max(200),
-  adopterPhone: phoneSchema,
-  adopterEmail: z.string().trim().email("Invalid email").max(200).optional().or(z.literal("")),
-  adopterAddress: z.string().trim().max(500).optional().or(z.literal("")),
-  adoptionDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Adoption date is required"),
-  shelterReference: z.string().trim().max(100).optional().or(z.literal("")),
-  adopterNote: z.string().trim().max(2000).optional().or(z.literal("")),
-});
-
 export async function changeKittenStatus(_prev: FormState, formData: FormData): Promise<FormState> {
   await requireUser();
   const parsed = baseStatusChange.safeParse(Object.fromEntries(formData));
@@ -174,22 +157,13 @@ export async function changeKittenStatus(_prev: FormState, formData: FormData): 
   }
 
   db.transaction((tx) => {
-    tx.update(kittens).set({ status: toStatus }).where(eq(kittens.id, kittenId)).run();
-    tx.insert(statusHistory)
-      .values({ kittenId, status: toStatus, note: note || null })
-      .run();
     if (adopterData) {
-      tx.insert(adopters)
-        .values({
-          kittenId,
-          name: adopterData.adopterName,
-          phone: adopterData.adopterPhone || null,
-          email: adopterData.adopterEmail || null,
-          address: adopterData.adopterAddress || null,
-          adoptionDate: adopterData.adoptionDate,
-          shelterReference: adopterData.shelterReference || null,
-          note: adopterData.adopterNote || null,
-        })
+      // markKittenAdopted writes the status move, status_history and adopter row.
+      markKittenAdopted(tx, kittenId, adopterData, note);
+    } else {
+      tx.update(kittens).set({ status: toStatus }).where(eq(kittens.id, kittenId)).run();
+      tx.insert(statusHistory)
+        .values({ kittenId, status: toStatus, note: note || null })
         .run();
     }
   });

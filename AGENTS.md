@@ -38,7 +38,8 @@ Conventions this enforces, which any change should preserve:
   `verify-prod.sh` (server/browser timezones differ), or the regression is invisible.
 - A new e2e target = a `seed-<target>.cjs` (or reuse one) + an `e2e-<target>.mjs`,
   both registered in `verify-prod.sh` (`seed_for` + `ALL_TARGETS`). `rev3` is the
-  mother-medical suite; `step5` is the kitten-medical suite.
+  mother-medical suite; `step5` is the kitten-medical suite; `rev4` is the
+  viewings & adoption-workflow suite.
 
 # Schema, migrations, and seeds
 
@@ -53,6 +54,14 @@ runtime** — FK enforcement stays ON through the whole migration.
   copy) raises a constraint violation mid-migration. The fix used for the medical
   table: the recreated table carries **no foreign keys at all** (the subject
   model below is already FK-less), so the `DROP`/`RENAME` is safe.
+- **Prefer `ALTER TABLE ADD/DROP COLUMN` over table recreation when the table has
+  children.** better-sqlite3 bundles SQLite ≥3.35, so column add/drop needs no
+  `__new_…` copy. The `viewings` rework (0007) used this: recreating `viewings`
+  would have implicitly deleted it, and the `ON DELETE CASCADE` from
+  `viewing_kittens` would have **wiped the join rows**. Adding `interested_party_id`
+  / `location`, backfilling, then dropping the old contact columns sidesteps that
+  entirely. (FK columns added via `ADD COLUMN` must be nullable — fine; the app and
+  Drizzle treat `viewings.interested_party_id` as `notNull` and always set it.)
 - **Hand-write structural migrations.** `drizzle-kit generate` prompts
   interactively for column renames/restructures (can't run here) and won't
   backfill a renamed/derived column, so it can't produce a data-preserving
@@ -88,3 +97,31 @@ medical/treatment records for **both** subjects via `subject_type`
   / `export-view.tsx`) are all subject-generic — extend the shared code, don't
   fork a parallel mother version. Exports stay plain Helvetica, no emoji, and
   omit adopter PII unless the admin opt-in is set (mothers have no adopter).
+
+# Viewings & adoption run through reusable interested parties
+
+`interested_parties` are first-class, reusable contact records (PII). `viewings`
+reference one via `interested_party_id` (real FK) and keep the `viewing_kittens`
+join, so a party links to many viewings and many kittens without retyping.
+
+- **The party pipeline lives in `src/lib/parties.ts`** (`PARTY_STATUSES`, labels,
+  badge classes, allowed transitions) — mirror `src/lib/status.ts`, don't inline
+  transition rules. `enquired → viewing_booked → viewed → approved → adopted` with
+  `withdrew`/`not_suitable` off-ramps; `adopted` is reachable **only** through the
+  link-to-kitten flow, never a bare status change.
+- **Adoption is shared, not forked.** `markKittenAdopted` (`src/lib/adoption.ts`)
+  does the kitten status move + `status_history` + `adopters` insert inside the
+  caller's transaction. Both `changeKittenStatus` (kitten pipeline) and `adoptParty`
+  (party→kitten link) call it, so the step-2 "adopted requires adopter details"
+  rule is satisfied once. `adoptParty` guards each kitten isn't already
+  adopted/deceased before writing — no silent double-adopt.
+- **PII gating is server-side.** Party create/edit/adopt actions and the
+  `new`/`edit` page loaders use `requireAdmin`; the list and detail pages omit
+  contact fields server-side for viewers (they aren't rendered-then-hidden).
+  Parties are excluded from the vet export (it's medical-only) and prunable —
+  don't retain non-proceeding contacts indefinitely.
+- View-models for the calendar/party pages come from `src/lib/viewing-data.ts`
+  (`getViewingItems`, `groupViewingsByTime`, `getPartyLinkedKittens`) — fixed-query
+  joins, no N+1, and `now` lives there (not in a component) to keep render pure.
+  Viewing times are datetime-local inputs pinned with `pinDatetimeField` before
+  submit; a viewing is an appointment, so future dates are valid.

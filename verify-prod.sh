@@ -47,10 +47,11 @@ seed_for() {
     step6) echo "seed-step6.cjs" ;;
     step7) echo "seed-step3.cjs" ;;
     rev3)  echo "seed-rev3.cjs" ;;
+    rev4)  echo "seed-rev4.cjs" ;;
     *) echo "__unknown__" ;;
   esac
 }
-ALL_TARGETS=(step2 step3 step4 step5 step6 step7 rev1 rev3)
+ALL_TARGETS=(step2 step3 step4 step5 step6 step7 rev1 rev3 rev4)
 
 # ---- args -------------------------------------------------------------------
 BUILD=1

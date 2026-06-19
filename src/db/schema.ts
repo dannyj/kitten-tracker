@@ -30,6 +30,19 @@ export type MedicalSubjectType = (typeof MEDICAL_SUBJECT_TYPES)[number];
 export const PHOTO_TAKEN_AT_SOURCES = ["exif", "manual", "upload"] as const;
 export const USER_ROLES = ["admin", "viewer"] as const;
 
+// Interested-party pipeline. enquired → viewing_booked → viewed → approved →
+// adopted, with the off-ramps withdrew / not_suitable. Foster-driven.
+export const PARTY_STATUSES = [
+  "enquired",
+  "viewing_booked",
+  "viewed",
+  "approved",
+  "adopted",
+  "withdrew",
+  "not_suitable",
+] as const;
+export type PartyStatus = (typeof PARTY_STATUSES)[number];
+
 const now = sql`(unixepoch())`;
 
 export const mothers = sqliteTable("mothers", {
@@ -195,12 +208,33 @@ export const adopters = sqliteTable("adopters", {
   note: text("note"),
 });
 
-export const viewings = sqliteTable("viewings", {
+// Reusable contact record for someone interested in adopting — linkable to many
+// viewings and many kittens without retyping. PII; full contact detail is
+// admin-gated in the actions/pages (mirrors the adopters rules).
+export const interestedParties = sqliteTable("interested_parties", {
   id: integer("id").primaryKey({ autoIncrement: true }),
-  visitedAt: integer("visited_at", { mode: "timestamp" }).notNull().default(now),
-  visitorName: text("visitor_name").notNull(),
+  name: text("name").notNull(),
+  partnerName: text("partner_name"),
   phone: text("phone"),
   email: text("email"),
+  address: text("address"),
+  source: text("source"),
+  status: text("status", { enum: PARTY_STATUSES }).notNull().default("enquired"),
+  notes: text("notes"),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull().default(now),
+});
+
+export const viewings = sqliteTable("viewings", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  // notNull in Drizzle + always set by the actions; the DB column is nullable
+  // because migration 0007 added it via ALTER TABLE on a populated table.
+  interestedPartyId: integer("interested_party_id")
+    .notNull()
+    .references(() => interestedParties.id),
+  visitedAt: integer("visited_at", { mode: "timestamp" }).notNull().default(now),
+  location: text("location"),
+  // The foster's read on the viewing (fit, living situation, other pets, general
+  // impression). Editable working judgement, not an audit record.
   notes: text("notes"),
 });
 

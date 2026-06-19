@@ -1,9 +1,14 @@
-// Proves migration 0006 (generalise the medical table to subject_type/subject_id)
-// preserves existing kitten medical history, under the EXACT conditions prod
-// uses: a connection with foreign_keys=ON, and the migration applied inside a
-// single transaction (drizzle's migrator wraps all statements in BEGIN/COMMIT,
-// which makes the PRAGMA foreign_keys lines no-ops — so the recreation must be
-// FK-safe on its own). Run: node scripts/verify-migration.cjs
+// Proves migrations 0006 and 0007 preserve existing data, under the EXACT
+// conditions prod uses: a connection with foreign_keys=ON, and the migration
+// applied inside a single transaction (drizzle's migrator wraps all statements in
+// BEGIN/COMMIT, which makes the PRAGMA foreign_keys lines no-ops — so each
+// migration must be FK-safe on its own). Run: node scripts/verify-migration.cjs
+//
+//  - 0006: generalise the medical table to subject_type/subject_id.
+//  - 0007: interested_parties + viewings rework (drop loose contact columns, add
+//    interested_party_id FK). The backfill must turn each distinct viewing
+//    contact tuple into one party and link every viewing, without dropping the
+//    viewing_kittens join (which ON DELETE CASCADEs off viewings).
 const Database = require("better-sqlite3");
 const fs = require("node:fs");
 const os = require("node:os");
@@ -149,7 +154,95 @@ try {
   }
   check("can insert new mother + kitten medical records", insertOk);
 
+  // ===========================================================================
+  // 0007 — interested_parties + viewings rework, applied on top of 0006.
+  // ===========================================================================
+  // Seed old-shape viewings: a contact shared across two viewings (must dedup to
+  // ONE party), and a null-phone contact, each with viewing_kittens rows.
+  const insOldViewing = db2.prepare(
+    "INSERT INTO viewings (visited_at, visitor_name, phone, email, notes) VALUES (?, ?, ?, ?, ?)",
+  );
+  const insVK = db2.prepare("INSERT INTO viewing_kittens (viewing_id, kitten_id) VALUES (?, ?)");
+  const vA = insOldViewing.run(1000, "Anna de Vries", "06-1111", "anna@x.nl", "keen on Muis").lastInsertRowid;
+  const vB = insOldViewing.run(2000, "Anna de Vries", "06-1111", "anna@x.nl", "second visit").lastInsertRowid; // same contact
+  const vC = insOldViewing.run(3000, "Bob", null, null, "walk-in").lastInsertRowid; // null phone/email
+  insVK.run(vA, k1);
+  insVK.run(vB, k2);
+  insVK.run(vC, k1);
+  insVK.run(vC, k2);
+
+  const vkBefore = db2.prepare("SELECT COUNT(*) n FROM viewing_kittens").get().n;
+  const viewingsBefore = db2.prepare("SELECT COUNT(*) n FROM viewings").get().n;
   db2.close();
+
+  const db3 = new Database(dbPath);
+  db3.pragma("journal_mode = WAL");
+  db3.pragma("foreign_keys = ON");
+  const sql0007 = fs.readFileSync(path.join("drizzle", "0007_interested_parties.sql"), "utf8");
+  const stmts0007 = sql0007.split("--> statement-breakpoint").map((s) => s.trim()).filter(Boolean);
+  db3.exec("BEGIN");
+  try {
+    for (const stmt of stmts0007) db3.exec(stmt);
+    db3.exec("COMMIT");
+  } catch (e) {
+    db3.exec("ROLLBACK");
+    throw e;
+  }
+
+  const partyCount = db3.prepare("SELECT COUNT(*) n FROM interested_parties").get().n;
+  check("one party per distinct contact tuple (2 from 3 viewings)", partyCount === 2, `got ${partyCount}`);
+
+  const viewingsAfter = db3.prepare("SELECT COUNT(*) n FROM viewings").get().n;
+  check("viewings not lost", viewingsAfter === viewingsBefore, `${viewingsBefore} -> ${viewingsAfter}`);
+
+  const unlinked = db3.prepare("SELECT COUNT(*) n FROM viewings WHERE interested_party_id IS NULL").get().n;
+  check("every viewing linked to a party", unlinked === 0, `${unlinked} unlinked`);
+
+  const vRows = db3.prepare("SELECT id, interested_party_id FROM viewings ORDER BY id").all();
+  const byId = Object.fromEntries(vRows.map((r) => [r.id, r.interested_party_id]));
+  check(
+    "shared contact maps both viewings to the same party",
+    byId[vA] === byId[vB] && byId[vA] !== byId[vC],
+  );
+
+  const annaParty = db3
+    .prepare("SELECT * FROM interested_parties WHERE name = 'Anna de Vries'")
+    .get();
+  check(
+    "party carries the migrated contact details",
+    annaParty && annaParty.phone === "06-1111" && annaParty.email === "anna@x.nl" && annaParty.status === "enquired",
+  );
+
+  const vkAfter = db3.prepare("SELECT COUNT(*) n FROM viewing_kittens").get().n;
+  check("viewing_kittens rows survived (not cascade-wiped)", vkAfter === vkBefore, `${vkBefore} -> ${vkAfter}`);
+
+  const vCols = db3.prepare("PRAGMA table_info(viewings)").all().map((c) => c.name);
+  check(
+    "old contact columns dropped, new columns present",
+    !vCols.includes("visitor_name") &&
+      !vCols.includes("phone") &&
+      !vCols.includes("email") &&
+      vCols.includes("interested_party_id") &&
+      vCols.includes("location"),
+  );
+
+  // New-shape inserts work end-to-end.
+  let viewingInsertOk = true;
+  try {
+    const p = db3
+      .prepare("INSERT INTO interested_parties (name, status) VALUES ('Carla', 'enquired')")
+      .run().lastInsertRowid;
+    const newV = db3
+      .prepare("INSERT INTO viewings (interested_party_id, visited_at, location, notes) VALUES (?, 4000, 'Shelter', 'note')")
+      .run(p).lastInsertRowid;
+    db3.prepare("INSERT INTO viewing_kittens (viewing_id, kitten_id) VALUES (?, ?)").run(newV, k1);
+  } catch (e) {
+    viewingInsertOk = false;
+    console.log("  insert error:", e.message);
+  }
+  check("can insert a new party + viewing + viewing_kitten", viewingInsertOk);
+
+  db3.close();
 } finally {
   fs.rmSync(tmp, { recursive: true, force: true });
 }
