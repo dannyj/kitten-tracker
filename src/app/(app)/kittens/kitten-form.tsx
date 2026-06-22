@@ -12,8 +12,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
+import { FEEDING_METHODS, type FeedingMethod } from "@/db/schema";
 import type { Kitten } from "@/db/types";
+import { FEEDING_METHOD_OPTION_LABELS } from "@/lib/feeding-method";
 import type { FormState } from "@/lib/forms";
 import { createKitten, updateKitten } from "./actions";
 
@@ -43,8 +44,8 @@ export function KittenForm({
   );
   const preselectedLitter = litterOptions.find((l) => String(l.id) === initialLitterId);
 
-  const [handFeeding, setHandFeeding] = useState(
-    state?.values ? state.values.handFeeding === "on" : (kitten?.handFeeding ?? false),
+  const [feedingMethod, setFeedingMethod] = useState<FeedingMethod>(
+    (state?.values?.feedingMethod as FeedingMethod) ?? kitten?.feedingMethod ?? "mother",
   );
   // Pre-fill birth date from the litter; user can override per kitten.
   const [birthDate, setBirthDate] = useState(
@@ -148,16 +149,29 @@ export function KittenForm({
       </div>
 
       <div className="flex flex-col gap-3 rounded-lg border p-3">
-        <div className="flex items-center justify-between">
-          <Label htmlFor="handFeeding">Hand-feeding</Label>
-          <Switch
-            id="handFeeding"
-            name="handFeeding"
-            checked={handFeeding}
-            onCheckedChange={setHandFeeding}
-          />
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="feedingMethod">Feeding method</Label>
+          <input type="hidden" name="feedingMethod" value={feedingMethod} />
+          <Select
+            value={feedingMethod}
+            onValueChange={(value) => setFeedingMethod(value as FeedingMethod)}
+          >
+            <SelectTrigger id="feedingMethod" className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {FEEDING_METHODS.map((method) => (
+                <SelectItem key={method} value={method}>
+                  {FEEDING_METHOD_OPTION_LABELS[method]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-muted-foreground text-xs">
+            Used to track bottle feeds and to tailor advice when a kitten isn&apos;t gaining enough.
+          </p>
         </div>
-        {handFeeding ? (
+        {feedingMethod === "hand" ? (
           <div className="flex flex-col gap-2">
             <Label htmlFor="feedingIntervalMinutes">Feeding interval (minutes)</Label>
             <Input

@@ -19,7 +19,7 @@ import type { KittenStatus } from "@/db/schema";
 export type KittenRowView = {
   id: number;
   name: string;
-  handFeeding: boolean;
+  handFed: boolean;
   coverPhotoId: number | null;
   shelterNumber: string | null;
   sexLabel: string;
@@ -79,7 +79,7 @@ export function KittensTable({ rows }: { rows: KittenRowView[] }) {
                     )}
                     <span className="flex items-center gap-1.5 font-medium">
                       {kitten.name}
-                      {kitten.handFeeding ? (
+                      {kitten.handFed ? (
                         <Milk
                           className="size-3.5 shrink-0 text-sky-600"
                           aria-label="Hand-feeding"

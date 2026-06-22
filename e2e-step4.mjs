@@ -58,11 +58,10 @@ try {
     `feeds: ${feedsBefore}`,
   );
 
-  // toggle OFF
+  // switch feeding method away from hand-fed -> hides the section
   await page.goto(`${BASE}${hidde}/edit`);
-  if (await page.locator("#handFeeding[data-state=checked]").count()) {
-    await page.click("#handFeeding");
-  }
+  await page.click("#feedingMethod");
+  await page.click("[role=option]:has-text('Mother is feeding')");
   await page.click("button:has-text('Save changes')");
   await page.waitForURL(new RegExp(`${hidde}$`));
   check(
@@ -70,11 +69,10 @@ try {
     !(await page.textContent("body")).includes("Hand-feeding"),
   );
 
-  // toggle ON again
+  // switch back to hand-fed -> restores the section
   await page.goto(`${BASE}${hidde}/edit`);
-  if (!(await page.locator("#handFeeding[data-state=checked]").count())) {
-    await page.click("#handFeeding");
-  }
+  await page.click("#feedingMethod");
+  await page.click("[role=option]:has-text('Hand-feeding')");
   await page.click("button:has-text('Save changes')");
   await page.waitForURL(new RegExp(`${hidde}$`));
   await page.waitForSelector("#feeding");

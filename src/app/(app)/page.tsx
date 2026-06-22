@@ -43,7 +43,7 @@ export default async function DashboardPage() {
   );
 
   // Last feed per active hand-fed kitten.
-  const handFedIds = activeKittens.filter((k) => k.handFeeding).map((k) => k.id);
+  const handFedIds = activeKittens.filter((k) => k.feedingMethod === "hand").map((k) => k.id);
   const lastFedByKitten = new Map<number, number>();
   if (handFedIds.length > 0) {
     for (const r of db
@@ -58,7 +58,7 @@ export default async function DashboardPage() {
   }
 
   const feedingRows: FeedingDueRow[] = activeKittens
-    .filter((k) => k.handFeeding)
+    .filter((k) => k.feedingMethod === "hand")
     .map((k) => ({
       id: k.id,
       name: k.name,
@@ -242,7 +242,7 @@ export default async function DashboardPage() {
                         </p>
                         <div className="flex flex-wrap items-center gap-2">
                           {alert ? <AlertBadge result={alert} /> : null}
-                          {kitten.handFeeding ? (
+                          {kitten.feedingMethod === "hand" ? (
                             <FeedCountdown
                               lastFedMs={lastFedByKitten.get(kitten.id) ?? null}
                               intervalMinutes={kitten.feedingIntervalMinutes}

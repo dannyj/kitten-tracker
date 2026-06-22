@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db } from "@/db";
-import { kittens, KITTEN_STATUSES, litters, statusHistory } from "@/db/schema";
+import { FEEDING_METHODS, kittens, KITTEN_STATUSES, litters, statusHistory } from "@/db/schema";
 import { adopterSchema, markKittenAdopted } from "@/lib/adoption";
 import { requireAdmin, requireUser } from "@/lib/auth/guard";
 import { formValues, type FormState } from "@/lib/forms";
@@ -26,10 +26,7 @@ const kittenSchema = z.object({
     .string()
     .optional()
     .transform((v) => v === "on" || v === "true"),
-  handFeeding: z
-    .string()
-    .optional()
-    .transform((v) => v === "on" || v === "true"),
+  feedingMethod: z.enum(FEEDING_METHODS).default("mother"),
   feedingIntervalMinutes: z.coerce
     .number()
     .int()
@@ -47,8 +44,9 @@ function kittenPayload(parsed: z.infer<typeof kittenSchema>) {
     color: parsed.color || null,
     birthDate: parsed.birthDate || null,
     birthDateEstimated: parsed.birthDateEstimated,
-    handFeeding: parsed.handFeeding,
-    feedingIntervalMinutes: parsed.handFeeding ? (parsed.feedingIntervalMinutes ?? 120) : 120,
+    feedingMethod: parsed.feedingMethod,
+    feedingIntervalMinutes:
+      parsed.feedingMethod === "hand" ? (parsed.feedingIntervalMinutes ?? 120) : 120,
   };
 }
 

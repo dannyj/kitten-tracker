@@ -34,6 +34,7 @@ import {
 import { evaluateAlert, TREND_ARROW } from "@/lib/alerts";
 import { requireUser } from "@/lib/auth/guard";
 import { formatAge, formatDate, formatDateTime, todayIso } from "@/lib/dates";
+import { FEEDING_METHOD_LABELS } from "@/lib/feeding-method";
 import { buildKittenGrowthSeries } from "@/lib/growth";
 import { getSubjectPhotos } from "@/lib/photo-data";
 import { nextDueAll } from "@/lib/schedule";
@@ -152,7 +153,7 @@ export default async function KittenDetailPage({ params }: { params: Promise<{ i
 
   // Feedings (only surfaced when the kitten is hand-fed, but always loaded so
   // toggling the flag back on shows the preserved history).
-  const feedingRows: FeedingRow[] = kitten.handFeeding
+  const feedingRows: FeedingRow[] = kitten.feedingMethod === "hand"
     ? db
         .select()
         .from(feedings)
@@ -191,7 +192,7 @@ export default async function KittenDetailPage({ params }: { params: Promise<{ i
           <div>
             <h1 className="flex items-center gap-2 text-2xl font-semibold">
               {kitten.name}
-              {kitten.handFeeding ? (
+              {kitten.feedingMethod === "hand" ? (
                 <span
                   className="inline-flex items-center gap-1 rounded-full bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-900"
                   title="Hand-feeding"
@@ -231,7 +232,8 @@ export default async function KittenDetailPage({ params }: { params: Promise<{ i
           <AlertBanner result={alert} />
           <HintsPanel
             urgent={alert.level === "urgent"}
-            feedingHref={kitten.handFeeding ? "#feeding" : undefined}
+            feedingMethod={kitten.feedingMethod}
+            feedingHref={kitten.feedingMethod === "hand" ? "#feeding" : undefined}
           />
         </div>
       ) : alert ? (
@@ -278,7 +280,13 @@ export default async function KittenDetailPage({ params }: { params: Promise<{ i
                     {litter ? ` · born ${formatDate(litter.birthDate)}` : ""}
                   </dd>
                 </div>
-                {kitten.handFeeding ? (
+                <div>
+                  <dt className="text-muted-foreground text-xs font-medium uppercase">
+                    Feeding method
+                  </dt>
+                  <dd>{FEEDING_METHOD_LABELS[kitten.feedingMethod]}</dd>
+                </div>
+                {kitten.feedingMethod === "hand" ? (
                   <div>
                     <dt className="text-muted-foreground text-xs font-medium uppercase">
                       Feeding interval
@@ -403,7 +411,7 @@ export default async function KittenDetailPage({ params }: { params: Promise<{ i
             </CardContent>
           </Card>
 
-          {kitten.handFeeding ? (
+          {kitten.feedingMethod === "hand" ? (
             <Card id="feeding" className="scroll-mt-20">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-base">

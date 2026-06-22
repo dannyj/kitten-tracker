@@ -17,7 +17,7 @@ const insLitter = db.prepare(
   "INSERT INTO litters (mother_id, birth_date, birth_date_estimated, notes) VALUES (?, ?, 0, ?)",
 );
 const insKitten = db.prepare(
-  `INSERT INTO kittens (litter_id, name, shelter_number, sex, birth_date, hand_feeding, feeding_interval_minutes, status, created_at)
+  `INSERT INTO kittens (litter_id, name, shelter_number, sex, birth_date, feeding_method, feeding_interval_minutes, status, created_at)
    VALUES (?, ?, ?, 'unknown', ?, ?, ?, 'in_care', ?)`,
 );
 const insHistory = db.prepare(
@@ -36,7 +36,7 @@ function kitten(litterId, name, shelter, { handFed, interval = 120, weights = []
     name,
     shelter,
     isoDaysAgo(18),
-    handFed ? 1 : 0,
+    handFed ? "hand" : "mother",
     interval,
     daysAgo(18),
   ).lastInsertRowid;

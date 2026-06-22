@@ -16,8 +16,8 @@ const insLitter = db.prepare(
   "INSERT INTO litters (mother_id, birth_date, birth_date_estimated, notes) VALUES (?, ?, 0, ?)",
 );
 const insKitten = db.prepare(
-  `INSERT INTO kittens (litter_id, name, shelter_number, sex, birth_date, hand_feeding, feeding_interval_minutes, status, created_at)
-   VALUES (?, ?, ?, ?, ?, 0, 120, ?, ?)`,
+  `INSERT INTO kittens (litter_id, name, shelter_number, sex, birth_date, feeding_method, feeding_interval_minutes, status, created_at)
+   VALUES (?, ?, ?, ?, ?, 'mother', 120, ?, ?)`,
 );
 const insHistory = db.prepare(
   "INSERT INTO status_history (kitten_id, status, changed_at, note) VALUES (?, ?, ?, ?)",

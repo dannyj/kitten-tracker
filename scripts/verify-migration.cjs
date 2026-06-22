@@ -9,6 +9,10 @@
 //    interested_party_id FK). The backfill must turn each distinct viewing
 //    contact tuple into one party and link every viewing, without dropping the
 //    viewing_kittens join (which ON DELETE CASCADEs off viewings).
+//  - 0008: replace the kittens.hand_feeding boolean with a feeding_method enum
+//    (mother|hand|weaned). It ALTERs in place (kittens has cascading children),
+//    so the hand-fed rows must backfill to 'hand', everything else to 'mother',
+//    and child rows (weight_entries/feedings) must survive untouched.
 const Database = require("better-sqlite3");
 const fs = require("node:fs");
 const os = require("node:os");
@@ -242,7 +246,78 @@ try {
   }
   check("can insert a new party + viewing + viewing_kitten", viewingInsertOk);
 
+  // ===========================================================================
+  // 0008 — feeding_method enum replacing hand_feeding, applied on top of 0007.
+  // ===========================================================================
+  // Seed a hand-fed kitten (must backfill to 'hand') and give it a weight entry
+  // (a cascading child that must survive the in-place ALTER). k1/k2 default to
+  // hand_feeding=0 and must become 'mother'.
+  const handKitten = db3
+    .prepare(
+      "INSERT INTO kittens (litter_id, name, sex, birth_date, hand_feeding, feeding_interval_minutes, status) VALUES (?, 'Bottle', 'unknown', '2026-04-01', 1, 90, 'in_care')",
+    )
+    .run(litter).lastInsertRowid;
+  db3
+    .prepare("INSERT INTO weight_entries (kitten_id, weight_grams) VALUES (?, 95)")
+    .run(handKitten);
+
+  const kittensBefore = db3.prepare("SELECT COUNT(*) n FROM kittens").get().n;
+  const weightsBefore = db3.prepare("SELECT COUNT(*) n FROM weight_entries").get().n;
   db3.close();
+
+  const db4 = new Database(dbPath);
+  db4.pragma("journal_mode = WAL");
+  db4.pragma("foreign_keys = ON");
+  const sql0008 = fs.readFileSync(path.join("drizzle", "0008_feeding_method.sql"), "utf8");
+  const stmts0008 = sql0008.split("--> statement-breakpoint").map((s) => s.trim()).filter(Boolean);
+  db4.exec("BEGIN");
+  try {
+    for (const stmt of stmts0008) db4.exec(stmt);
+    db4.exec("COMMIT");
+  } catch (e) {
+    db4.exec("ROLLBACK");
+    throw e;
+  }
+
+  const kCols = db4.prepare("PRAGMA table_info(kittens)").all().map((c) => c.name);
+  check(
+    "hand_feeding dropped, feeding_method added",
+    !kCols.includes("hand_feeding") && kCols.includes("feeding_method"),
+  );
+
+  const kittensAfter = db4.prepare("SELECT COUNT(*) n FROM kittens").get().n;
+  check("kitten count unchanged", kittensAfter === kittensBefore, `${kittensBefore} -> ${kittensAfter}`);
+  const weightsAfter = db4.prepare("SELECT COUNT(*) n FROM weight_entries").get().n;
+  check(
+    "weight_entries (cascading child) survived the in-place ALTER",
+    weightsAfter === weightsBefore,
+    `${weightsBefore} -> ${weightsAfter}`,
+  );
+
+  const handRow = db4.prepare("SELECT feeding_method FROM kittens WHERE id = ?").get(handKitten);
+  check("hand-fed kitten backfilled to 'hand'", handRow.feeding_method === "hand", handRow.feeding_method);
+  const motherRows = db4
+    .prepare("SELECT feeding_method FROM kittens WHERE id IN (?, ?)")
+    .all(k1, k2);
+  check(
+    "non-hand-fed kittens backfilled to 'mother'",
+    motherRows.every((r) => r.feeding_method === "mother"),
+  );
+
+  let weanedInsertOk = true;
+  try {
+    db4
+      .prepare(
+        "INSERT INTO kittens (litter_id, name, sex, feeding_method, status) VALUES (?, 'Solid', 'unknown', 'weaned', 'in_care')",
+      )
+      .run(litter);
+  } catch (e) {
+    weanedInsertOk = false;
+    console.log("  insert error:", e.message);
+  }
+  check("can insert a kitten with feeding_method='weaned'", weanedInsertOk);
+
+  db4.close();
 } finally {
   fs.rmSync(tmp, { recursive: true, force: true });
 }

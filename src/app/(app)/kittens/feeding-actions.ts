@@ -54,7 +54,7 @@ export async function addFeeding(_prev: FormState, formData: FormData): Promise<
   const kitten = db.select().from(kittens).where(eq(kittens.id, parsed.data.kittenId)).get();
   if (!kitten) return { error: "Kitten not found" };
   // Feeds are only logged for hand-fed kittens (the UI is hidden otherwise).
-  if (!kitten.handFeeding) return { error: "This kitten isn't marked as hand-fed." };
+  if (kitten.feedingMethod !== "hand") return { error: "This kitten isn't marked as hand-fed." };
 
   db.insert(feedings)
     .values({

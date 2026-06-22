@@ -75,7 +75,7 @@ export default async function KittensPage({
   const rowViews: KittenRowView[] = rows.map((kitten) => ({
     id: kitten.id,
     name: kitten.name,
-    handFeeding: kitten.handFeeding,
+    handFed: kitten.feedingMethod === "hand",
     coverPhotoId: covers.get(kitten.id) ?? null,
     shelterNumber: kitten.shelterNumber,
     sexLabel: SEX_LABELS[kitten.sex],

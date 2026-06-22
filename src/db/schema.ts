@@ -19,6 +19,11 @@ export const KITTEN_STATUSES = [
 ] as const;
 export type KittenStatus = (typeof KITTEN_STATUSES)[number];
 
+// How a kitten is currently fed. Drives both the hand-feeding tracking module
+// (only "hand") and the tailored "not gaining enough" advice in HintsPanel.
+export const FEEDING_METHODS = ["mother", "hand", "weaned"] as const;
+export type FeedingMethod = (typeof FEEDING_METHODS)[number];
+
 export const MOTHER_HEALTH_CATEGORIES = ["eating", "behaviour", "medical", "other"] as const;
 export const FEEDING_QUALITIES = ["good", "slow", "refused"] as const;
 export const PHOTO_SUBJECT_TYPES = ["kitten", "mother"] as const;
@@ -90,7 +95,7 @@ export const kittens = sqliteTable(
     birthDateEstimated: integer("birth_date_estimated", { mode: "boolean" })
       .notNull()
       .default(false),
-    handFeeding: integer("hand_feeding", { mode: "boolean" }).notNull().default(false),
+    feedingMethod: text("feeding_method", { enum: FEEDING_METHODS }).notNull().default("mother"),
     feedingIntervalMinutes: integer("feeding_interval_minutes").notNull().default(120),
     status: text("status", { enum: KITTEN_STATUSES }).notNull().default("intake"),
     // Chosen cover photo; nulled automatically if that photo is deleted.

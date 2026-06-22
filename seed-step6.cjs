@@ -17,8 +17,8 @@ const litter = db
 // Birth 2026-05-01; an EXIF photo dated 2026-05-20 => age 2w 5d.
 const muis = db
   .prepare(
-    `INSERT INTO kittens (litter_id, name, shelter_number, sex, birth_date, hand_feeding, feeding_interval_minutes, status, created_at)
-     VALUES (?, 'Muis', 'K-2026-001', 'female', '2026-05-01', 0, 120, 'in_care', ?)`,
+    `INSERT INTO kittens (litter_id, name, shelter_number, sex, birth_date, feeding_method, feeding_interval_minutes, status, created_at)
+     VALUES (?, 'Muis', 'K-2026-001', 'female', '2026-05-01', 'mother', 120, 'in_care', ?)`,
   )
   .run(litter, daysAgo(43)).lastInsertRowid;
 db.prepare(

@@ -62,8 +62,9 @@ try {
     await page.fill("#name", names[i]);
     await page.fill("#shelterNumber", `K-2026-00${i + 1}`);
     if (i === 0) {
-      // hand-feeding toggle reveals interval
-      await page.click("#handFeeding");
+      // choosing the hand-feeding method reveals the interval field
+      await page.click("#feedingMethod");
+      await page.click("[role=option]:has-text('Hand-feeding')");
       await page.waitForSelector("#feedingIntervalMinutes");
       await page.fill("#feedingIntervalMinutes", "120");
     }
