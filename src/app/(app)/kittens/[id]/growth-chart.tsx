@@ -74,7 +74,7 @@ export function GrowthChart({ points }: { points: GrowthChartPoint[] }) {
           formatter={(value, name) => {
             if (name === "weight") return [`${value} g`, "Weight"];
             // The band series' value is a [low, high] tuple — show it as a range.
-            if (Array.isArray(value)) return [`${value[0]}–${value[1]} g`, "Expected range"];
+            if (Array.isArray(value)) return [`${value[0]}–${value[1]} g`, "Healthy gain band"];
             return [`${value} g`, name];
           }}
         />
@@ -89,7 +89,7 @@ export function GrowthChart({ points }: { points: GrowthChartPoint[] }) {
           isAnimationActive={false}
           activeDot={false}
           legendType="none"
-          name="Expected range"
+          name="Healthy gain band"
         />
         <Line
           dataKey="weight"

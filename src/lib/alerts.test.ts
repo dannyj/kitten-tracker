@@ -40,7 +40,7 @@ test("ok: gaining at the target rate", () => {
   assert.equal(r.trend, "up");
 });
 
-test("warning: gaining but below the 7 g/day floor", () => {
+test("warning: gaining but below the daily-gain floor", () => {
   // +6 g over 2 days span = 3 g/day, below floor, but no loss and net positive over 24h
   const r = evaluateAlert([at(48, 200), at(24, 203), at(0, 206)], DEFAULT_ALERT_SETTINGS, NOW);
   assert.equal(r.level, "warning");

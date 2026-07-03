@@ -1,20 +1,16 @@
 import type { Metadata } from "next";
-import { Inter, Source_Serif_4 } from "next/font/google";
+import { Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 
-// Self-hosted at build time by next/font (downloaded + served from our own
-// origin — no runtime hotlink to Google). Inter for UI/body, Source Serif 4
-// for an academic/editorial heading note. Swap to next/font/local if licensed
-// faces (e.g. Styrene/Tiempos) are ever supplied.
-const inter = Inter({
+// Plus Jakarta Sans is the Kitten Tracker brand typeface (style guide §04) —
+// a humanist sans used for body, UI, and headings alike. Self-hosted at build
+// time by next/font (downloaded + served from our own origin, no runtime
+// hotlink to Google). Weights: 400 body/data, 500 headings/labels/interactive,
+// 600 reserved for the wordmark only.
+const jakarta = Plus_Jakarta_Sans({
   variable: "--font-sans",
   subsets: ["latin"],
-  display: "swap",
-});
-
-const sourceSerif = Source_Serif_4({
-  variable: "--font-serif",
-  subsets: ["latin"],
+  weight: ["400", "500", "600"],
   display: "swap",
 });
 
@@ -34,7 +30,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${inter.variable} ${sourceSerif.variable} h-full antialiased`}>
+    <html lang="en" className={`${jakarta.variable} h-full antialiased`}>
       <body className="flex min-h-full flex-col">{children}</body>
     </html>
   );

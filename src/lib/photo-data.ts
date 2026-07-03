@@ -34,6 +34,30 @@ export function getSubjectPhotos(subjectType: PhotoSubject, subjectId: number): 
 }
 
 /**
+ * Most-recent photo id per subject, for thumbnails on subjects with no explicit
+ * cover column (e.g. mothers). One query for the whole list — no N+1.
+ */
+export function recentPhotoIdBySubject(
+  subjectType: PhotoSubject,
+  ids: number[],
+): Map<number, number | null> {
+  const out = new Map<number, number | null>();
+  for (const id of ids) out.set(id, null);
+  if (ids.length > 0) {
+    const rows = db
+      .select({ id: photos.id, subjectId: photos.subjectId })
+      .from(photos)
+      .where(and(eq(photos.subjectType, subjectType), inArray(photos.subjectId, ids)))
+      .orderBy(desc(photos.takenAt), desc(photos.id))
+      .all();
+    for (const r of rows) {
+      if (out.get(r.subjectId) == null) out.set(r.subjectId, r.id);
+    }
+  }
+  return out;
+}
+
+/**
  * Resolve each kitten's cover photo id (explicit cover, else most recent), for
  * thumbnails in list/dashboard views.
  */

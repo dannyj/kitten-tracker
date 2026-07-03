@@ -26,8 +26,9 @@ export function WeighLitterButton({ litters }: { litters: WeighableLitter[] }) {
   if (litters.length === 0) return null;
 
   if (litters.length === 1) {
+    // w-auto alone still stretches (flex-col parent); self-start makes it shrink-to-fit.
     return (
-      <Button asChild size="lg" className="w-full sm:w-auto">
+      <Button asChild size="lg" className="w-full sm:w-auto sm:self-start">
         <Link href={`/litters/${litters[0].id}/weigh`}>
           <Scale className="size-4" aria-hidden /> Weigh litter
         </Link>
@@ -38,7 +39,7 @@ export function WeighLitterButton({ litters }: { litters: WeighableLitter[] }) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size="lg" className="w-full sm:w-auto">
+        <Button size="lg" className="w-full sm:w-auto sm:self-start">
           <Scale className="size-4" aria-hidden /> Weigh litter
         </Button>
       </DialogTrigger>

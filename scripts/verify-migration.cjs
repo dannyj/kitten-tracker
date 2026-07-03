@@ -13,6 +13,9 @@
 //    (mother|hand|weaned). It ALTERs in place (kittens has cascading children),
 //    so the hand-fed rows must backfill to 'hand', everything else to 'mother',
 //    and child rows (weight_entries/feedings) must survive untouched.
+//  - 0009: add the kitten_care_logs table (purely additive CREATE TABLE). No
+//    data transform, so this just proves it applies under FKs-ON in one txn,
+//    leaves kittens untouched, accepts inserts, and cascades on kitten delete.
 const Database = require("better-sqlite3");
 const fs = require("node:fs");
 const os = require("node:os");
@@ -317,7 +320,63 @@ try {
   }
   check("can insert a kitten with feeding_method='weaned'", weanedInsertOk);
 
+  // ===========================================================================
+  // 0009 — add kitten_care_logs, applied on top of 0008.
+  // ===========================================================================
+  const kittensBefore9 = db4.prepare("SELECT COUNT(*) n FROM kittens").get().n;
   db4.close();
+
+  const db5 = new Database(dbPath);
+  db5.pragma("journal_mode = WAL");
+  db5.pragma("foreign_keys = ON");
+  const sql0009 = fs.readFileSync(path.join("drizzle", "0009_kitten_care_log.sql"), "utf8");
+  const stmts0009 = sql0009.split("--> statement-breakpoint").map((s) => s.trim()).filter(Boolean);
+  db5.exec("BEGIN");
+  try {
+    for (const stmt of stmts0009) db5.exec(stmt);
+    db5.exec("COMMIT");
+  } catch (e) {
+    db5.exec("ROLLBACK");
+    throw e;
+  }
+
+  const careTable = db5
+    .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='kitten_care_logs'")
+    .get();
+  check("kitten_care_logs table created", !!careTable);
+  const kittensAfter9 = db5.prepare("SELECT COUNT(*) n FROM kittens").get().n;
+  check("kitten count unchanged by additive migration", kittensAfter9 === kittensBefore9, `${kittensBefore9} -> ${kittensAfter9}`);
+
+  // Insert works, default category applies, and the FK cascades on kitten delete.
+  let careInsertOk = true;
+  let cascadeOk = false;
+  try {
+    const throwaway = db5
+      .prepare("INSERT INTO kittens (litter_id, name, sex, feeding_method, status) VALUES (?, 'Temp', 'unknown', 'mother', 'in_care')")
+      .run(litter).lastInsertRowid;
+    db5
+      .prepare("INSERT INTO kitten_care_logs (kitten_id, category, entry) VALUES (?, 'milestone', 'Eyes opened')")
+      .run(k1);
+    db5
+      .prepare("INSERT INTO kitten_care_logs (kitten_id, entry) VALUES (?, 'Default category')")
+      .run(throwaway);
+    const def = db5
+      .prepare("SELECT category FROM kitten_care_logs WHERE kitten_id = ?")
+      .get(throwaway);
+    careInsertOk = def && def.category === "other";
+    db5.prepare("DELETE FROM kittens WHERE id = ?").run(throwaway);
+    const orphans = db5
+      .prepare("SELECT COUNT(*) n FROM kitten_care_logs WHERE kitten_id = ?")
+      .get(throwaway).n;
+    cascadeOk = orphans === 0;
+  } catch (e) {
+    careInsertOk = false;
+    console.log("  insert error:", e.message);
+  }
+  check("care log inserts, default category 'other' applies", careInsertOk);
+  check("care logs cascade-delete with their kitten", cascadeOk);
+
+  db5.close();
 } finally {
   fs.rmSync(tmp, { recursive: true, force: true });
 }

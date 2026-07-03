@@ -5,6 +5,7 @@ import {
   Cat,
   LineChart,
   Milk,
+  NotebookPen,
   Pencil,
   Pill,
   Scale,
@@ -24,6 +25,7 @@ import { db } from "@/db";
 import {
   adopters,
   feedings,
+  kittenCareLogs,
   kittens,
   litters,
   mothers,
@@ -40,6 +42,7 @@ import { getSubjectPhotos } from "@/lib/photo-data";
 import { nextDueAll } from "@/lib/schedule";
 import { getAlertSettings, getScheduleTemplates } from "@/lib/settings";
 import { ACTIVE_STATUSES, STATUS_LABELS } from "@/lib/status";
+import { CareLog, type CareLogEntry } from "./care-log";
 import { FeedingCard, type FeedingRow } from "./feeding-card";
 import { GrowthChart } from "./growth-chart";
 import { MedicalCard, type VaccinationRow } from "./medical-card";
@@ -69,6 +72,18 @@ export default async function KittenDetailPage({ params }: { params: Promise<{ i
     .where(eq(statusHistory.kittenId, kitten.id))
     .orderBy(desc(statusHistory.changedAt), desc(statusHistory.id))
     .all();
+  const careLogs = db
+    .select()
+    .from(kittenCareLogs)
+    .where(eq(kittenCareLogs.kittenId, kitten.id))
+    .orderBy(desc(kittenCareLogs.loggedAt), desc(kittenCareLogs.id))
+    .all();
+  const careLogRows: CareLogEntry[] = careLogs.map((log) => ({
+    id: log.id,
+    category: log.category,
+    entry: log.entry,
+    loggedAtMs: log.loggedAt.getTime(),
+  }));
   const isAdmin = user.role === "admin";
   const adopterRows = isAdmin
     ? db
@@ -153,23 +168,24 @@ export default async function KittenDetailPage({ params }: { params: Promise<{ i
 
   // Feedings (only surfaced when the kitten is hand-fed, but always loaded so
   // toggling the flag back on shows the preserved history).
-  const feedingRows: FeedingRow[] = kitten.feedingMethod === "hand"
-    ? db
-        .select()
-        .from(feedings)
-        .where(eq(feedings.kittenId, kitten.id))
-        .orderBy(desc(feedings.fedAt), desc(feedings.id))
-        .all()
-        .map((f) => ({
-          id: f.id,
-          fedAtMs: f.fedAt.getTime(),
-          amountMl: f.amountMl,
-          formula: f.formula,
-          quality: f.quality,
-          note: f.note,
-          createdAtMs: f.createdAt.getTime(),
-        }))
-    : [];
+  const feedingRows: FeedingRow[] =
+    kitten.feedingMethod === "hand"
+      ? db
+          .select()
+          .from(feedings)
+          .where(eq(feedings.kittenId, kitten.id))
+          .orderBy(desc(feedings.fedAt), desc(feedings.id))
+          .all()
+          .map((f) => ({
+            id: f.id,
+            fedAtMs: f.fedAt.getTime(),
+            amountMl: f.amountMl,
+            formula: f.formula,
+            quality: f.quality,
+            note: f.note,
+            createdAtMs: f.createdAt.getTime(),
+          }))
+      : [];
 
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-6">
@@ -378,6 +394,17 @@ export default async function KittenDetailPage({ params }: { params: Promise<{ i
                   </li>
                 ))}
               </ol>
+            </CardContent>
+          </Card>
+
+          <Card id="care-log" className="scroll-mt-20">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <NotebookPen className="size-4" aria-hidden /> Care log
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <CareLog kittenId={kitten.id} logs={careLogRows} />
             </CardContent>
           </Card>
 

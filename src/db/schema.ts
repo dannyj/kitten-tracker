@@ -25,6 +25,13 @@ export const FEEDING_METHODS = ["mother", "hand", "weaned"] as const;
 export type FeedingMethod = (typeof FEEDING_METHODS)[number];
 
 export const MOTHER_HEALTH_CATEGORIES = ["eating", "behaviour", "medical", "other"] as const;
+export const KITTEN_CARE_CATEGORIES = [
+  "milestone",
+  "behaviour",
+  "socialisation",
+  "husbandry",
+  "other",
+] as const;
 export const FEEDING_QUALITIES = ["good", "slow", "refused"] as const;
 export const PHOTO_SUBJECT_TYPES = ["kitten", "mother"] as const;
 // Medical records and schedule templates are keyed to either subject, mirroring
@@ -107,6 +114,19 @@ export const kittens = sqliteTable(
   },
   (t) => [uniqueIndex("kittens_shelter_number_unique").on(t.shelterNumber)],
 );
+
+// Free-form, categorised care/observation log per kitten (milestones and
+// husbandry notes that aren't weights, feeds, or medical records). Mirrors
+// mother_health_logs; same 15-minute edit window enforced in the actions.
+export const kittenCareLogs = sqliteTable("kitten_care_logs", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  kittenId: integer("kitten_id")
+    .notNull()
+    .references(() => kittens.id, { onDelete: "cascade" }),
+  loggedAt: integer("logged_at", { mode: "timestamp" }).notNull().default(now),
+  category: text("category", { enum: KITTEN_CARE_CATEGORIES }).notNull().default("other"),
+  entry: text("entry").notNull(),
+});
 
 export const weightEntries = sqliteTable("weight_entries", {
   id: integer("id").primaryKey({ autoIncrement: true }),

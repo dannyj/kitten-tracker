@@ -212,28 +212,28 @@ export default async function DashboardPage() {
               const coverId = covers.get(kitten.id);
               return (
                 <Link key={kitten.id} href={`/kittens/${kitten.id}`} className="group">
-                  <Card className="group-hover:border-primary/50 h-full transition-colors">
-                    <CardContent className="flex items-center gap-3 p-3">
+                  <Card className="h-full transition-all group-hover:ring-primary/40 group-hover:shadow-sm">
+                    <CardContent className="flex items-center gap-4">
                       {coverId ? (
                         <Image
                           src={`/api/photos/${coverId}?thumb=1`}
                           alt=""
-                          width={56}
-                          height={56}
+                          width={72}
+                          height={72}
                           unoptimized
-                          className="size-14 shrink-0 rounded-md object-cover"
+                          className="size-18 shrink-0 rounded-xl object-cover"
                         />
                       ) : (
-                        <span className="bg-muted flex size-14 shrink-0 items-center justify-center rounded-md">
-                          <Cat className="text-muted-foreground size-6" aria-hidden />
+                        <span className="bg-muted flex size-18 shrink-0 items-center justify-center rounded-xl">
+                          <Cat className="text-muted-foreground size-8" aria-hidden />
                         </span>
                       )}
-                      <div className="flex min-w-0 flex-col gap-0.5">
-                        <div className="flex items-center gap-1.5">
-                          <span className="truncate font-medium">{kitten.name}</span>
+                      <div className="flex min-w-0 flex-col gap-1.5">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="truncate text-base font-medium">{kitten.name}</span>
                           <StatusBadge status={kitten.status} />
                         </div>
-                        <p className="text-muted-foreground text-xs">
+                        <p className="text-muted-foreground text-sm">
                           {formatAge(kitten.birthDate, { estimated: kitten.birthDateEstimated }) ??
                             "age unknown"}
                           {last

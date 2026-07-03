@@ -33,6 +33,9 @@ const insAdopter = db.prepare(
   `INSERT INTO adopters (kitten_id, name, phone, email, address, adoption_date, shelter_reference, note)
    VALUES (?, ?, ?, ?, ?, ?, ?, NULL)`,
 );
+const insCareLog = db.prepare(
+  "INSERT INTO kitten_care_logs (kitten_id, logged_at, category, entry) VALUES (?, ?, ?, ?)",
+);
 
 db.transaction(() => {
   const mama = insMother.run("Mama", nowSec).lastInsertRowid;
@@ -66,6 +69,8 @@ db.transaction(() => {
   );
   // One deworming at 2wk; next deworming (4wk) overdue at 9wk
   insVacc.run(muis, "deworming", isoDaysAgo(49), "DW-12", "self", null, null, null, daysAgo(49));
+  // Care log: a locked milestone (logged 5d ago -> outside 15-min edit window).
+  insCareLog.run(muis, daysAgo(5), "milestone", "First time using the litter box");
 
   // Pip: 9wk, no vaccinations at all -> deworming + FVRCP overdue. No weights.
   const pip = insKitten.run(

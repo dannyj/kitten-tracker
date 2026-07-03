@@ -1,5 +1,6 @@
 import { count, desc, max } from "drizzle-orm";
 import { Heart, Plus } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -7,6 +8,7 @@ import { db } from "@/db";
 import { litters, motherHealthLogs, mothers } from "@/db/schema";
 import { requireUser } from "@/lib/auth/guard";
 import { formatDate, formatDateTime } from "@/lib/dates";
+import { recentPhotoIdBySubject } from "@/lib/photo-data";
 
 export const metadata = { title: "Mothers — Kitten Tracker" };
 
@@ -32,6 +34,10 @@ export default async function MothersPage() {
     .all();
   const littersByMother = new Map(litterCounts.map((r) => [r.motherId, r.n]));
   const lastLogByMother = new Map(lastLogs.map((r) => [r.motherId, r.last]));
+  const covers = recentPhotoIdBySubject(
+    "mother",
+    rows.map((m) => m.id),
+  );
 
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-6">
@@ -54,26 +60,43 @@ export default async function MothersPage() {
         <div className="grid gap-3 sm:grid-cols-2">
           {rows.map((mother) => {
             const lastLog = lastLogByMother.get(mother.id);
+            const coverId = covers.get(mother.id);
             return (
               <Link key={mother.id} href={`/mothers/${mother.id}`} className="group">
-                <Card className="group-hover:border-primary/50 transition-colors">
-                  <CardContent className="flex flex-col gap-1 p-4">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="font-medium">{mother.name}</span>
-                      <span className="text-muted-foreground text-xs">
-                        {MOTHER_STATUS_LABELS[mother.status] ?? mother.status}
+                <Card className="h-full transition-all group-hover:ring-primary/40 group-hover:shadow-sm">
+                  <CardContent className="flex items-center gap-4">
+                    {coverId ? (
+                      <Image
+                        src={`/api/photos/${coverId}?thumb=1`}
+                        alt=""
+                        width={72}
+                        height={72}
+                        unoptimized
+                        className="size-18 shrink-0 rounded-xl object-cover"
+                      />
+                    ) : (
+                      <span className="bg-muted flex size-18 shrink-0 items-center justify-center rounded-xl">
+                        <Heart className="text-muted-foreground size-8" aria-hidden />
                       </span>
+                    )}
+                    <div className="flex min-w-0 flex-1 flex-col gap-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="truncate text-base font-medium">{mother.name}</span>
+                        <span className="text-muted-foreground shrink-0 text-xs">
+                          {MOTHER_STATUS_LABELS[mother.status] ?? mother.status}
+                        </span>
+                      </div>
+                      <p className="text-muted-foreground text-sm">
+                        {mother.shelterNumber ? `#${mother.shelterNumber} · ` : ""}
+                        intake {formatDate(mother.intakeDate)}
+                      </p>
+                      <p className="text-muted-foreground text-sm">
+                        {littersByMother.get(mother.id) ?? 0} litter(s)
+                        {lastLog
+                          ? ` · last health log ${formatDateTime(lastLog)}`
+                          : " · no health logs"}
+                      </p>
                     </div>
-                    <p className="text-muted-foreground text-sm">
-                      {mother.shelterNumber ? `#${mother.shelterNumber} · ` : ""}
-                      intake {formatDate(mother.intakeDate)}
-                    </p>
-                    <p className="text-muted-foreground text-sm">
-                      {littersByMother.get(mother.id) ?? 0} litter(s)
-                      {lastLog
-                        ? ` · last health log ${formatDateTime(lastLog)}`
-                        : " · no health logs"}
-                    </p>
                   </CardContent>
                 </Card>
               </Link>

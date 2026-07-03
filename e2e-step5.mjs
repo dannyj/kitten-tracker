@@ -121,6 +121,35 @@ try {
       /FV-77-Ä/.test(afterCorrection),
   );
 
+  // ---- Care log: seeded locked entry renders; new entry adds & is editable ----
+  await page.goto(`${BASE}${muis}`);
+  await page.waitForSelector("#care-log");
+  const seededCare = page.locator("#care-log li:has-text('First time using the litter box')");
+  check(
+    "Care log: seeded milestone renders with category",
+    (await seededCare.count()) === 1 && /Milestone/.test((await seededCare.textContent()) ?? ""),
+  );
+  check(
+    "Care log: entry older than 15 min is locked (no Edit)",
+    (await seededCare.locator("button:has-text('Edit')").count()) === 0,
+  );
+  // Add a new entry via the Radix Select + textarea.
+  const careForm = page.locator("#care-log form").first();
+  await careForm.locator("button[role=combobox]").click();
+  await page.locator("[role=option]:has-text('Behaviour')").click();
+  await careForm.locator("textarea[name=entry]").fill("Very playful with littermates");
+  await careForm.locator("button:has-text('Add entry')").click();
+  const addedCare = page.locator("#care-log li:has-text('Very playful with littermates')");
+  await addedCare.waitFor();
+  check(
+    "Care log: new entry saves with chosen category",
+    /Behaviour/.test((await addedCare.textContent()) ?? ""),
+  );
+  check(
+    "Care log: freshly-added entry is editable within window",
+    (await addedCare.locator("button:has-text('Edit')").count()) === 1,
+  );
+
   // ---- AC4: dashboard medical panel, overdue pinned, one-tap log ----
   await page.goto(`${BASE}/`);
   await page.waitForSelector("text=Medical due");

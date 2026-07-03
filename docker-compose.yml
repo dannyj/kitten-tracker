@@ -28,9 +28,41 @@ services:
       retries: 3
       start_period: 20s
 
+  # Tailscale sidecar: shares the app's network namespace and exposes it on the
+  # tailnet at http://kittens:3000 (WireGuard-encrypted, no public exposure).
+  # First start prints a login URL in the logs (TS_AUTH_ONCE, no authkey) —
+  # open it to authorise the node. Mirrors the ts-* sidecars in docker_files.
+  ts-kitten:
+    # Pinned by digest (was the floating :stable tag) so a rebuild can't silently
+    # pull a changed image into this NET_ADMIN-capable sidecar. Re-resolve with:
+    #   docker manifest inspect tailscale/tailscale:stable --verbose | grep -m1 digest
+    image: tailscale/tailscale:stable@sha256:25cde9ad76020b0e29229136d0c38b5962e9a0e1774ffac9b0df68e4a37d6cf0
+    container_name: ts-kitten
+    restart: unless-stopped
+    network_mode: "service:kitten-app"
+    depends_on:
+      - kitten-app
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    environment:
+      - TS_AUTH_ONCE=true
+      - TS_STATE_DIR=/var/lib/tailscale
+      - TS_HOSTNAME=kittens
+      - TS_ACCEPT_DNS=false
+      # Tag the node so the tailnet policy (docs/tailscale-policy.hujson) can
+      # deny it OUTBOUND to peers — it only ever needs to receive on :3000.
+      # The tag must exist in the policy's tagOwners BEFORE first auth, or the
+      # interactive login is rejected. See README "Tailnet lockdown".
+      - TS_EXTRA_ARGS=--advertise-tags=tag:kittens
+    volumes:
+      - ts-kitten-state:/var/lib/tailscale
+
 volumes:
   kitten-db:
   kitten-photos:
+  ts-kitten-state:
 
 networks:
   proxy:

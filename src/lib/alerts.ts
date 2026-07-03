@@ -24,8 +24,11 @@ export type AlertSettings = {
 };
 
 export const DEFAULT_ALERT_SETTINGS: AlertSettings = {
-  minDailyGainG: 7,
-  targetDailyGainG: 10,
+  // Vet guidance for neonatal kittens: gain ~10 g/day minimum, ~15 g/day target
+  // (≈100 g/week). The band is a healthy-gain floor, not an upper cap — vigorous
+  // kittens routinely exceed the target and that is expected, not a problem.
+  minDailyGainG: 10,
+  targetDailyGainG: 15,
   lossPctUrgent: 5,
   noGainHoursUrgent: 24,
 };

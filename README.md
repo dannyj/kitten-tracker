@@ -58,6 +58,16 @@ docker exec -it kitten-app node scripts/create-user.cjs --username danny --role 
 
 The app publishes **no host port**; only NPM can reach it over the shared `kitten_proxy` network. If the `npm` container is recreated, re-run the `docker network connect` line.
 
+After the stack is up, apply the network lockdown (see [Host network lockdown](#host-network-lockdown-lateral-movement-controls)):
+
+```bash
+sudo ./scripts/host-firewall.sh apply           # block app->npm:81 and app->LAN
+```
+
+The `ts-kitten` tailnet node must be tagged and constrained too — apply
+`docs/tailscale-policy.hujson` in the Tailscale admin console **before** the node
+first authenticates (see [Tailnet lockdown](#host-network-lockdown-lateral-movement-controls)).
+
 ### Nginx Proxy Manager proxy host
 
 - Domain `kittens.danny-hall.net`; Scheme `http`, Forward Hostname `kitten-app`, Forward Port `3000`.
@@ -130,3 +140,50 @@ Because of the step-1 architecture (app behind NPM, no published port), exposure
 - Production errors show a clean message — no stack traces leak to the client.
 - Container runs non-root with a read-only root filesystem (only `/data`, `/photos`, tmpfs writable) and `no-new-privileges`.
 - `npm audit` is clean and dependencies are pinned.
+- The `ts-kitten` Tailscale sidecar image is pinned by digest (not the floating `:stable` tag) so a rebuild can't silently change a `NET_ADMIN`-capable container.
+
+## Host network lockdown (lateral-movement controls)
+
+If the app container is ever compromised, these limit what it can reach. They live
+outside the app (tailnet policy + host firewall) and are applied **on the host**,
+not baked into the image.
+
+**1. Tailnet lockdown (`docs/tailscale-policy.hujson`).** `ts-kitten` shares the
+app's network namespace, so the WireGuard interface lives inside the app
+container — a compromised app could otherwise reach every tailnet peer. The
+policy tags the node `tag:kittens` and, because tagged nodes aren't
+`autogroup:member`, the node can **receive** on `:3000` but cannot **initiate** to
+any peer. Apply it in the Tailscale admin console (Access Controls) **before**
+the node first authenticates — `--advertise-tags=tag:kittens` (set in
+`docker-compose.yml`) is rejected at login if the tag has no owner yet. Verify:
+
+```bash
+docker exec ts-kitten tailscale status      # node should show the "kittens" tag
+```
+
+**2 + 3. Host firewall (`scripts/host-firewall.sh`).** Installs DOCKER-USER rules
+scoped to the `kitten_proxy` subnet:
+
+- blocks the app from NPM's admin port (`:81`) — admin stays LAN-reachable;
+- blocks the app from the LAN and other private networks (host SSH, Pi-hole,
+  other Docker bridges) while keeping the `npm`↔app proxy flow and Tailscale's
+  internet egress working.
+
+```bash
+sudo ./scripts/host-firewall.sh apply     # install/refresh
+sudo ./scripts/host-firewall.sh status    # show managed rules
+sudo ./scripts/host-firewall.sh clear     # roll back
+```
+
+`DOCKER-USER` is recreated empty on **Docker daemon restart**, so re-apply after
+one. To persist, add a root crontab entry:
+
+```cron
+@reboot sleep 30 && /home/danny/Documents/repos/kitten_app/scripts/host-firewall.sh apply >> /var/log/kitten-fw.log 2>&1
+```
+
+**Honest limit:** the firewall stops LAN pivots and reaching other containers, but
+a port-based allowlist can't distinguish Tailscale's DERP-on-443 from arbitrary
+HTTPS, so it does **not** block internet exfil/C2 over 443. Closing that needs an
+egress proxy (out of scope). After `apply`, always confirm `tailscale status`
+still connects; if not, `clear` and widen the allowlist.

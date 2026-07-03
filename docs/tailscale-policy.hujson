@@ -1,0 +1,42 @@
+// Tailnet access-control policy for the kitten-app deployment.
+//
+// PURPOSE (lateral-movement path 1): the ts-kitten sidecar shares kitten-app's
+// network namespace, so the WireGuard `tailscale0` interface lives inside the
+// app container. A compromised app can therefore SEND traffic over the tunnel
+// to any tailnet peer. Tailscale ACLs default to allow-all until an `acls`
+// block exists; once it does, the tailnet is default-DENY except listed rules.
+//
+// The `kittens` node is tagged `tag:kittens`. A tagged device is NOT a member
+// of `autogroup:member`, so the broad member rule below grants it nothing as a
+// SOURCE. `tag:kittens` appears only as a DESTINATION (receive on :3000).
+// Net effect: the kitten-app node can be reached on :3000 but cannot initiate
+// connections to any other tailnet peer.
+//
+// APPLY: paste into the Tailscale admin console -> Access Controls, Save.
+// Do this BEFORE bringing up ts-kitten with --advertise-tags=tag:kittens
+// (interactive login is rejected if the tag has no owner yet).
+//
+// IMPORTANT: introducing this `acls` block flips your whole tailnet from
+// allow-all to default-deny. The first rule preserves your existing access for
+// real users/devices. If you already maintain a custom policy, MERGE these
+// stanzas into it rather than replacing it.
+{
+  "tagOwners": {
+    "tag:kittens": ["autogroup:admin"],
+  },
+
+  "acls": [
+    // Preserve normal tailnet behaviour for your own users/devices.
+    // Tagged nodes (like kittens) are excluded from autogroup:member, so this
+    // does NOT grant the kitten-app node any outbound reach.
+    { "action": "accept", "src": ["autogroup:member"], "dst": ["*:*"] },
+
+    // The kitten-app node may only RECEIVE connections, and only on :3000.
+    // It is never listed as a `src`, so under default-deny it cannot initiate
+    // to any peer. This is the path-1 mitigation.
+    { "action": "accept", "src": ["autogroup:member"], "dst": ["tag:kittens:3000"] },
+  ],
+
+  // No Tailscale SSH into the tagged node.
+  "ssh": [],
+}

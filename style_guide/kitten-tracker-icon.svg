@@ -1,0 +1,36 @@
+<svg width="512" height="512" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+  <title>KittenTracker — icon mark</title>
+  <desc>Kitten Tracker icon: white cat head on forest teal rounded square. Use for favicons, app icons, and navigation.</desc>
+
+  <!-- Teal rounded square background -->
+  <rect width="64" height="64" rx="16" fill="#1D7874"/>
+
+  <!-- Cat head mark — white, centred in 64×64
+       Source mark is 52×56. Scale = 48/56 ≈ 0.857 → display 44.6×48
+       Centre x: (64 − 44.6) / 2 ≈ 9.7 → offset x = 9.7
+       Centre y: (64 − 48) / 2 = 8   → offset y = 8  -->
+  <g transform="translate(9.7,8) scale(0.857)">
+    <!-- Ears (white) -->
+    <polygon points="5,26 14,4 23,22" fill="white" fill-opacity="0.95"/>
+    <polygon points="47,26 38,4 29,22" fill="white" fill-opacity="0.95"/>
+    <!-- Head (white) -->
+    <rect x="5" y="18" width="42" height="34" rx="13" fill="white" fill-opacity="0.95"/>
+    <!-- Inner ear shading -->
+    <polygon points="8,25 14,9 21,22" fill="#1D7874" fill-opacity="0.12"/>
+    <polygon points="44,25 38,9 31,22" fill="#1D7874" fill-opacity="0.12"/>
+    <!-- Eyes -->
+    <ellipse cx="18" cy="32" rx="4.5" ry="4" fill="#1D7874"/>
+    <ellipse cx="34" cy="32" rx="4.5" ry="4" fill="#1D7874"/>
+    <!-- Pupils -->
+    <ellipse cx="18.8" cy="32" rx="2" ry="3.2" fill="#0A2E2C"/>
+    <ellipse cx="34.8" cy="32" rx="2" ry="3.2" fill="#0A2E2C"/>
+    <!-- Nose -->
+    <path d="M24,40 L26,37.5 L28,40 Z" fill="#1D7874"/>
+    <!-- Mouth -->
+    <path d="M23.5,40.5 Q26,43 28.5,40.5" stroke="#1D7874" stroke-width="0.9" fill="none"/>
+    <!-- Amber tracker dots -->
+    <circle cx="39" cy="44" r="2" fill="#F2A63D"/>
+    <circle cx="44" cy="41.5" r="1.3" fill="#F2A63D" fill-opacity="0.7"/>
+    <circle cx="47.5" cy="45" r="1" fill="#F2A63D" fill-opacity="0.4"/>
+  </g>
+</svg>

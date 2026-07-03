@@ -64,7 +64,7 @@ export function DashboardFeeding({ rows }: { rows: FeedingDueRow[] }) {
             className={
               overdue
                 ? "flex items-center justify-between gap-3 rounded-lg border border-red-200 bg-red-50 p-3"
-                : "flex items-center justify-between gap-3 rounded-lg border p-3"
+                : "flex items-center justify-between gap-3 rounded-lg border bg-card p-3"
             }
           >
             <div className="min-w-0">

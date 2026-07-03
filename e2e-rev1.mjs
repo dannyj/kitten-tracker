@@ -110,12 +110,12 @@ try {
   }, okkieId);
   check("Item 4: PDF still generates with chart+table", pdf.status === 200 && pdf.head === "%PDF-" && pdf.len > 2000, `${pdf.len} bytes`);
 
-  // ---- Item 5: serif headings applied ----
+  // ---- Item 5: brand typeface applied (Plus Jakarta Sans, style guide §04) ----
   await page.goto(`${BASE}/`);
   const h1Font = await page.locator("h1").first().evaluate((el) => getComputedStyle(el).fontFamily);
-  check("Item 5: headings use a serif (Source Serif)", /serif/i.test(h1Font), h1Font);
+  check("Item 5: headings use Plus Jakarta Sans", /jakarta/i.test(h1Font), h1Font);
   const bodyFont = await page.evaluate(() => getComputedStyle(document.body).fontFamily);
-  check("Item 5: body uses Inter", /inter/i.test(bodyFont), bodyFont);
+  check("Item 5: body uses Plus Jakarta Sans", /jakarta/i.test(bodyFont), bodyFont);
 } catch (err) {
   check("script completed", false, String(err).split("\n")[0]);
   await page.screenshot({ path: "/tmp/kitten_rev1_failure.png", fullPage: true }).catch(() => {});

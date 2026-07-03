@@ -32,7 +32,7 @@ export function KittensTable({ rows }: { rows: KittenRowView[] }) {
   const router = useRouter();
 
   return (
-    <div className="overflow-x-auto rounded-lg border">
+    <div className="bg-card overflow-x-auto rounded-lg border">
       <Table>
         <TableHeader>
           <TableRow>
