@@ -34,6 +34,8 @@ Conventions this enforces, which any change should preserve:
 - **Parity over persistence:** match production's _config_ (the standalone image,
   `TZ=UTC`, env) rather than standing up a long-lived second server. Anything
   timezone-, locale-, or env-sensitive must be exercised under that config.
+- Keep the default test browser in `Europe/Amsterdam`. `Europe/London` has the
+  same UTC offset as the server in winter, which hides timezone regressions.
 - New time-bearing inputs or server actions need an e2e that runs under
   `verify-prod.sh` (server/browser timezones differ), or the regression is invisible.
 - A new e2e target = a `seed-<target>.cjs` (or reuse one) + an `e2e-<target>.mjs`,
@@ -125,3 +127,12 @@ join, so a party links to many viewings and many kittens without retyping.
   joins, no N+1, and `now` lives there (not in a component) to keep render pure.
   Viewing times are datetime-local inputs pinned with `pinDatetimeField` before
   submit; a viewing is an appointment, so future dates are valid.
+
+# Login limits and audit retention
+
+- Never use forwarding headers as a trusted login identity. NPM and direct Tailscale clients can supply them. Login audit IP is null.
+- Login has account and global verification limits, a concurrency limit, and an action-level request limit before validation. Keep the action-level gate: Server Actions can arrive on alternate paths that bypass a path-specific proxy gate.
+- Limit state belongs to one standalone process. Use shared storage before adding replicas. Successful login does not reset verification limits.
+- Refuse new account keys when limiter storage is full. Never evict a live limit to accept a new key.
+- Aggregate rate-limited login audit events with bounded counters and timed summaries. Never write one database row per rejected request.
+- Audit timestamps use Unix seconds. Retain 90 days; maintenance removes only rows strictly older than the cutoff. Audit failures must not alter login limits.

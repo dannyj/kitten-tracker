@@ -31,7 +31,7 @@ cd "$(dirname "$0")"
 
 PORT=3100
 SERVER_TZ="${SERVER_TZ:-UTC}"          # matches the Docker container (prod)
-CLIENT_TZ="${CLIENT_TZ:-Europe/London}" # browser zone; must differ from SERVER_TZ
+CLIENT_TZ="${CLIENT_TZ:-Europe/Amsterdam}" # stays non-UTC in winter and summer
 ADMIN_USER=danny;  ADMIN_PASS=local-test-password-123
 VIEWER_USER=viewer; VIEWER_PASS=viewer-test-pass-99
 STANDALONE=.next/standalone
@@ -41,6 +41,7 @@ seed_for() {
   case "$1" in
     rev1)  echo "seed-step3.cjs" ;;
     step2) echo "" ;;
+    security) echo "" ;;
     step3) echo "seed-step3.cjs" ;;
     step4) echo "seed-step4.cjs" ;;
     step5) echo "seed-step5.cjs" ;;
@@ -51,7 +52,7 @@ seed_for() {
     *) echo "__unknown__" ;;
   esac
 }
-ALL_TARGETS=(step2 step3 step4 step5 step6 step7 rev1 rev3 rev4)
+ALL_TARGETS=(step2 step3 step4 step5 step6 step7 rev1 rev3 rev4 security)
 
 # ---- args -------------------------------------------------------------------
 BUILD=1
