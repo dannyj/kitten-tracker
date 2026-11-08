@@ -6,8 +6,8 @@ const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
   {
-    // Plain CommonJS on purpose: runs with bare node inside the runtime container.
-    files: ["scripts/**/*.cjs"],
+    // These standalone Node.js helper scripts use CommonJS.
+    files: ["scripts/**/*.cjs", "style_guide/build-style-guide.js"],
     rules: {
       "@typescript-eslint/no-require-imports": "off",
     },

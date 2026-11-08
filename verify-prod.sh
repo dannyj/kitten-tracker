@@ -31,7 +31,7 @@ cd "$(dirname "$0")"
 
 PORT=3100
 SERVER_TZ="${SERVER_TZ:-UTC}"          # matches the Docker container (prod)
-CLIENT_TZ="${CLIENT_TZ:-Europe/London}" # browser zone; must differ from SERVER_TZ
+CLIENT_TZ="${CLIENT_TZ:-Europe/Amsterdam}" # stays non-UTC in winter and summer
 ADMIN_USER=danny;  ADMIN_PASS=local-test-password-123
 VIEWER_USER=viewer; VIEWER_PASS=viewer-test-pass-99
 STANDALONE=.next/standalone
@@ -41,6 +41,8 @@ seed_for() {
   case "$1" in
     rev1)  echo "seed-step3.cjs" ;;
     step2) echo "" ;;
+    security) echo "" ;;
+    calendar) echo "" ;;
     step3) echo "seed-step3.cjs" ;;
     step4) echo "seed-step4.cjs" ;;
     step5) echo "seed-step5.cjs" ;;
@@ -51,7 +53,7 @@ seed_for() {
     *) echo "__unknown__" ;;
   esac
 }
-ALL_TARGETS=(step2 step3 step4 step5 step6 step7 rev1 rev3 rev4)
+ALL_TARGETS=(step2 step3 step4 step5 step6 step7 rev1 rev3 rev4 security calendar)
 
 # ---- args -------------------------------------------------------------------
 BUILD=1
@@ -97,7 +99,12 @@ rm -rf "$STANDALONE/drizzle"; cp -r drizzle "$STANDALONE/drizzle"
 
 # ---- per-target run ---------------------------------------------------------
 start_server() {  # $1 = db path, $2 = photos dir
+  local clock_options="${NODE_OPTIONS:-}"
+  if [ "${3:-}" = calendar ]; then
+    clock_options="$clock_options --require=$PWD/e2e-calendar-clock.cjs"
+  fi
   ( cd "$STANDALONE" && TZ="$SERVER_TZ" PORT="$PORT" HOSTNAME=127.0.0.1 \
+      NODE_OPTIONS="$clock_options" \
       SESSION_SECRET="$SECRET" DATABASE_PATH="$1" PHOTOS_PATH="$2" \
       node server.js ) >/tmp/verify-prod-server.log 2>&1 &
   SERVER_PID=$!
@@ -125,7 +132,7 @@ run_one() {  # $1 = target
   db="$TMP/kittens.db"; photos="$TMP/photos"; mkdir -p "$photos"
 
   echo "── $target  (seed: ${seed:-none}, server=$SERVER_TZ, browser=$CLIENT_TZ)"
-  start_server "$db" "$photos" || { stop_server; rm -rf "$TMP"; TMP=""; return 1; }
+  start_server "$db" "$photos" "$target" || { stop_server; rm -rf "$TMP"; TMP=""; return 1; }
 
   [ -n "$seed" ] && DATABASE_PATH="$db" node "$seed" >/dev/null
   printf '%s' "$ADMIN_PASS"  | DATABASE_PATH="$db" node scripts/create-user.cjs --username "$ADMIN_USER"  --role admin  >/dev/null

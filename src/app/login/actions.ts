@@ -1,14 +1,13 @@
 "use server";
 
 import { eq } from "drizzle-orm";
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db } from "@/db";
 import { users } from "@/db/schema";
-import { audit } from "@/lib/audit";
+import { audit, auditLoginRejection } from "@/lib/audit";
 import { getDummyPasswordHash, verifyPassword } from "@/lib/auth/password";
-import { consumeLoginAttempt, resetLoginAttempts } from "@/lib/auth/rate-limit";
+import { acquireLoginAttempt, consumeLoginRequest } from "@/lib/auth/rate-limit";
 import { createSession, generateSessionToken, setSessionCookie } from "@/lib/auth/session";
 
 const loginSchema = z.object({
@@ -18,14 +17,11 @@ const loginSchema = z.object({
 
 export type LoginState = { error: string } | null;
 
-async function clientIp(): Promise<string> {
-  const headerStore = await headers();
-  // Behind Nginx Proxy Manager the client address arrives in X-Forwarded-For.
-  const forwarded = headerStore.get("x-forwarded-for");
-  return forwarded?.split(",")[0]?.trim() || headerStore.get("x-real-ip") || "unknown";
-}
-
 export async function login(_prev: LoginState, formData: FormData): Promise<LoginState> {
+  if (!consumeLoginRequest()) {
+    auditLoginRejection();
+    return { error: "Too many requests. Try again in one minute." };
+  }
   const parsed = loginSchema.safeParse({
     username: formData.get("username"),
     password: formData.get("password"),
@@ -34,33 +30,38 @@ export async function login(_prev: LoginState, formData: FormData): Promise<Logi
     return { error: "Enter a username and password." };
   }
 
-  const ip = await clientIp();
+  // Neither NPM nor direct Tailscale headers prove the socket peer identity.
+  const ip = null;
   const { username, password } = parsed.data;
 
-  if (!consumeLoginAttempt(ip)) {
-    audit("login.rate_limited", { username, ip });
+  const release = acquireLoginAttempt(username);
+  if (!release) {
+    auditLoginRejection();
     return { error: "Too many attempts. Try again in 15 minutes." };
   }
 
-  const user = db.select().from(users).where(eq(users.username, username)).get();
+  try {
+    const user = db.select().from(users).where(eq(users.username, username)).get();
 
-  let validPassword = false;
-  if (user) {
-    validPassword = await verifyPassword(user.passwordHash, password);
-  } else {
-    // Burn the same hashing time for unknown usernames (no timing oracle).
-    await verifyPassword(await getDummyPasswordHash(), password);
+    let validPassword = false;
+    if (user) {
+      validPassword = await verifyPassword(user.passwordHash, password);
+    } else {
+      // Burn the same hashing time for unknown usernames (no timing oracle).
+      await verifyPassword(await getDummyPasswordHash(), password);
+    }
+
+    if (!user || !validPassword) {
+      audit("login.failure", { username, ip });
+      return { error: "Invalid username or password." };
+    }
+
+    audit("login.success", { username: user.username, ip });
+    const token = generateSessionToken();
+    const session = createSession(token, user.id);
+    await setSessionCookie(token, session.expiresAt);
+    redirect("/");
+  } finally {
+    release();
   }
-
-  if (!user || !validPassword) {
-    audit("login.failure", { username, ip });
-    return { error: "Invalid username or password." };
-  }
-
-  resetLoginAttempts(ip);
-  audit("login.success", { username: user.username, ip });
-  const token = generateSessionToken();
-  const session = createSession(token, user.id);
-  await setSessionCookie(token, session.expiresAt);
-  redirect("/");
 }

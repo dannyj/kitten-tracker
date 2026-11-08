@@ -195,9 +195,16 @@ try {
   await page.click("button:has-text('Add entry')");
   await page.waitForSelector("text=Eet goed");
   await page.fill("#new-entry", "Tweede observatie.");
+  const savedEntry = page.waitForResponse(
+    (response) => response.request().method() === "POST" && response.url() === motherUrl,
+  );
   await page.click("button:has-text('Add entry')");
-  await page.waitForTimeout(500);
+  await (await savedEntry).finished();
+  await page.waitForSelector("li:has-text('Tweede observatie.')");
   await page.reload();
+  // Edit controls appear only after the client clock hydrates.
+  await page.waitForSelector("li:has-text('Tweede observatie.') button:has-text('Edit')");
+  await page.waitForSelector("li:has-text('Eet goed') button:has-text('Edit')");
   const entries = await page.locator("li:has(button:has-text('Edit'))").allTextContents();
   check(
     "AC6: entries newest first",
