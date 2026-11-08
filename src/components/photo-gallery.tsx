@@ -25,9 +25,8 @@ const fullUrl = (id: number) => `/api/photos/${id}`;
 
 function ageInfo(birthDateIso: string | null | undefined, takenAtMs: number | null) {
   if (!birthDateIso || takenAtMs === null) return { ageText: null, beforeBirth: false };
-  const birth = new Date(`${birthDateIso}T00:00:00`).getTime();
-  if (takenAtMs < birth) return { ageText: null, beforeBirth: true };
-  return { ageText: formatAge(birthDateIso, { until: new Date(takenAtMs) }), beforeBirth: false };
+  const ageText = formatAge(birthDateIso, { until: new Date(takenAtMs) });
+  return { ageText, beforeBirth: ageText === null };
 }
 
 const SOURCE_LABEL = { exif: "from photo", manual: "set manually", upload: "upload date" } as const;

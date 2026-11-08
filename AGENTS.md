@@ -36,12 +36,17 @@ Conventions this enforces, which any change should preserve:
   timezone-, locale-, or env-sensitive must be exercised under that config.
 - Keep the default test browser in `Europe/Amsterdam`. `Europe/London` has the
   same UTC offset as the server in winter, which hides timezone regressions.
+- Date-only values use the shelter calendar, `Europe/Amsterdam`, on server and
+  browser. Use `todayIso()` for its current date. Age counts calendar days, not
+  elapsed 24-hour periods. Keep timestamps absolute and pin datetime-local inputs.
 - New time-bearing inputs or server actions need an e2e that runs under
   `verify-prod.sh` (server/browser timezones differ), or the regression is invisible.
 - A new e2e target = a `seed-<target>.cjs` (or reuse one) + an `e2e-<target>.mjs`,
   both registered in `verify-prod.sh` (`seed_for` + `ALL_TARGETS`). `rev3` is the
   mother-medical suite; `step5` is the kitten-medical suite; `rev4` is the
   viewings & adoption-workflow suite.
+- `calendar` freezes test clocks at 23:30 UTC, when Amsterdam is already on the
+  next date. Its Date preload is test-only; never add it to production startup.
 
 # Schema, migrations, and seeds
 

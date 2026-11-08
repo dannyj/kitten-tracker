@@ -41,6 +41,11 @@ try {
   // ---- AC1a: quick-add a weight on a kitten detail page ----
   const vlekHref = await kittenIdByName("Vlek");
   await page.goto(`${BASE}${vlekHref}`);
+  // The client ref initializes this value after the server HTML arrives.
+  await page.waitForFunction(() => {
+    const input = document.querySelector("#weighedAt");
+    return input instanceof HTMLInputElement && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(input.value);
+  });
   const tsValue = await page.inputValue("#weighedAt");
   check(
     "AC1: weigh form timestamp defaults to now",
@@ -85,10 +90,14 @@ try {
   }
   await page.click("button:has-text('Save all weights')");
   await page.waitForSelector("text=Weigh-in saved");
-  check("AC1: litter weigh-in records all siblings at once", inputCount === 4, `inputs: ${inputCount}`);
+  check(
+    "AC1: litter weigh-in records all siblings at once",
+    inputCount === 4,
+    `inputs: ${inputCount}`,
+  );
   // Enhancement: the summary shows a per-kitten gain/loss + verdict for each saved weight.
   const litterFeedback = page
-    .locator('[role=status]')
+    .locator("[role=status]")
     .filter({ hasText: /(On track|Be aware|Keep weighing)/ });
   check(
     "AC1: litter weigh-in summary shows per-kitten gain/loss + verdict",
@@ -99,6 +108,7 @@ try {
   // ---- AC2: per-kitten chart + trend matches hand calc ----
   const okkieHref = await kittenIdByName("Okkie");
   await page.goto(`${BASE}${okkieHref}`);
+  await page.waitForSelector("svg.recharts-surface");
   const hasChart = (await page.locator("svg.recharts-surface").count()) > 0;
   check("AC2: per-kitten growth chart renders", hasChart);
   const okkieBody = await page.textContent("body");
@@ -122,7 +132,13 @@ try {
     check(`AC3: litter chart legend includes ${n}`, inLegend);
   }
   await page.click("button:has-text('% gain from birth')");
-  await page.waitForTimeout(300);
+  await page.locator("button[data-variant=default]:has-text('% gain from birth')").waitFor();
+  // Recharts 3 can omit the old axis wrapper classes. Read the visible unit.
+  await page
+    .locator("svg.recharts-surface text")
+    .filter({ hasText: /^-?\d+(?:\.\d+)?%$/ })
+    .first()
+    .waitFor();
   check("AC3: %-gain toggle works", (await page.locator("svg.recharts-surface").count()) > 0);
 
   // ---- AC4: alert states classify correctly ----
@@ -201,15 +217,21 @@ try {
   await page.goto(`${BASE}/settings`);
   await page.fill("#targetDailyGainG", "20"); // floor must stay <= target
   await page.fill("#minDailyGainG", "15");
+  const savedThresholds = page.waitForResponse(
+    (response) => response.request().method() === "POST" && response.url() === `${BASE}/settings`,
+  );
   await page.click("button:has-text('Save thresholds')");
-  await page.waitForTimeout(500);
+  await (await savedThresholds).finished();
   await page.goto(`${BASE}/alerts`);
   body = await page.textContent("body");
   check("AC5: raising floor to 15 flags Okkie (was ok at ~10.9 g/day)", body.includes("Okkie"));
   // reset
   await page.goto(`${BASE}/settings`);
+  const resetThresholds = page.waitForResponse(
+    (response) => response.request().method() === "POST" && response.url() === `${BASE}/settings`,
+  );
   await page.click("button:has-text('Reset to defaults')");
-  await page.waitForTimeout(500);
+  await (await resetThresholds).finished();
   await page.goto(`${BASE}/alerts`);
   check(
     "AC5: reset restores defaults (Okkie no longer flagged)",

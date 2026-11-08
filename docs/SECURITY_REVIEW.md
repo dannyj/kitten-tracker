@@ -45,12 +45,14 @@ Checks used an isolated temporary source copy and a fresh installation of the lo
 
 - Standalone build: passed with Next.js 16.4.5.
 - Type checking: passed.
-- Unit tests: all 36 passed, including eight login and audit tests.
+- Unit tests: all 40 passed, including eight login/audit tests and four calendar tests.
 - Backup permissions and archive-error test: passed with a Docker substitute and synthetic files. A real Docker backup and restore remains untested.
-- Lint on changed code: passed. Full lint reports two existing CommonJS import errors in `style_guide/build-style-guide.js`.
-- Production parity: server UTC, browser Europe/Amsterdam. `step4`, `step6`, `step7`, `rev1`, and `rev4` passed.
-- The new `security` suite passed after correcting its form-alert selector. It tests changing forwarding headers and alternate Server Action paths.
-- `step2` failed age and entry-date assertions. `step3` failed its timestamp-default assertion. `step5` and `rev3` timed out in medical workflows. These failures remain unresolved; deployment is blocked.
+- Full lint: passed with three existing unused-variable warnings in `style_guide/build-style-guide.js`. The configuration permits CommonJS in that standalone Node.js script.
+- Production parity: all 11 suites passed with server UTC and browser Europe/Amsterdam: `step2`, `step3`, `step4`, `step5`, `step6`, `step7`, `rev1`, `rev3`, `rev4`, `security`, and `calendar`.
+- The `security` suite tests changing forwarding headers and alternate Server Action paths.
+- The `calendar` suite fixes the clocks at 23:30 UTC, when Amsterdam is already on the next date. It checks age and medical dates for kittens and mothers. Local today succeeds; tomorrow remains rejected by the server.
+
+Date-only values and ages now use the Amsterdam calendar on both server and browser. Age counts calendar days across daylight-saving changes. Photo age warnings use the same rule. Tests wait for initialized fields and completed actions before checking their results.
 
 The browser default now uses Europe/Amsterdam. Europe/London shares the server's UTC offset in winter and can hide timezone errors.
 
