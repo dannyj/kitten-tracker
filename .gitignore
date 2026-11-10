@@ -43,3 +43,5 @@ next-env.d.ts
 # local data (SQLite DB, photos)
 /data/
 !.env.example
+.aider*
+*handoff.md
