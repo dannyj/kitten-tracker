@@ -1,5 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { RequestLimit } from "@/lib/auth/login-limits";
 import { SESSION_COOKIE_NAME } from "@/lib/auth/cookie-name";
+
+// This request gate has independent state from the server-action verification gate.
+const loginRequests = new RequestLimit();
 
 // Per-request nonce so the CSP can avoid 'unsafe-inline' for scripts. Next.js
 // picks the nonce up from the request CSP header and applies it to its own
@@ -38,6 +42,17 @@ function withSecurityHeaders(request: NextRequest): NextResponse {
 // server components and actions via getCurrentSession().
 export default function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  if (
+    (pathname === "/login" || request.headers.has("next-action")) &&
+    request.method === "POST" &&
+    !loginRequests.consume()
+  ) {
+    return NextResponse.json(
+      { error: "Too many requests." },
+      { status: 429, headers: { "Retry-After": "60" } },
+    );
+  }
 
   const isPublicPage = pathname === "/login";
   const isHealthCheck = pathname === "/api/health"; // used by the Docker healthcheck

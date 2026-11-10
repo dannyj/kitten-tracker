@@ -75,6 +75,47 @@ first authenticates (see [Tailnet lockdown](#host-network-lockdown-lateral-movem
 - SSL: certificate via **DNS-01 / Cloudflare**, Force SSL on, HTTP/2 on. Enable **HSTS** once the cert has been stable for a while.
 - Resolve `kittens.danny-hall.net` to NPM's LAN IP (`192.168.80.68`) via a Pi-hole local DNS record.
 
+### Login ingress limits and audit retention
+
+The application does not trust `X-Forwarded-For` or `X-Real-IP` as client identity.
+Keep account and global verification limits enabled on every access route.
+The application request gate also covers login actions submitted to another path.
+These application limits do not replace a network ingress limit.
+
+For NPM, create `/data/nginx/custom/http_top.conf` in the NPM container volume:
+
+```nginx
+limit_req_zone $binary_remote_addr zone=kitten_requests:10m rate=5r/s;
+```
+
+Add this line to the kittens proxy host **Advanced** configuration:
+
+```nginx
+limit_req zone=kitten_requests burst=20 nodelay;
+limit_req_status 429;
+```
+
+Test the configuration with `nginx -t` inside NPM before reload.
+This limit covers all requests to this proxy host, including alternate action paths.
+Direct Tailscale access bypasses NPM; the application limits still apply.
+These NPM changes require a separate operator action on the host.
+
+Rejected login bursts produce one start event and one summary per active minute.
+The summary includes the rejected request count. An abrupt restart can lose pending counts.
+Ordinary password failures remain individually logged within the global verification limit.
+Audit write errors do not bypass limits or prevent login.
+
+Audit retention is 90 days. An audit write triggers cleanup at most once per hour.
+Schedule daily maintenance so retention also applies when no audit activity occurs:
+
+```cron
+15 3 * * * docker exec kitten-app node scripts/audit-maintenance.cjs
+```
+
+Monitor scheduler exit status. The command reports database bytes and audit row count.
+It exits nonzero at 1 GiB or one million audit rows. Adjust these thresholds for host capacity.
+Retention makes expired SQLite pages reusable; it does not shrink the database file.
+
 ### Health
 
 - `GET /api/health` checks DB reachability (the only unauthenticated route) and is wired into the compose healthcheck.
@@ -89,11 +130,35 @@ scripts/backup.sh                     # writes ~/kitten-backups/kittens-TS.db + 
 
 Schedule nightly via cron on the host:
 
-```cron
-0 3 * * * /home/danny/Documents/repos/kitten_app/scripts/backup.sh >> /home/danny/kitten-backups/backup.log 2>&1
+Create the private directory before cron opens its log file:
+
+```bash
+install -d -m 700 "$HOME/kitten-backups"
 ```
 
-Retention: last 14 days (`RETAIN_DAYS`). **Copy backups off the server** (rsync/scp to another machine) — a backup that only lives on the box it protects isn't a backup.
+```cron
+0 3 * * * umask 077; /home/danny/Documents/repos/kitten_app/scripts/backup.sh >> /home/danny/kitten-backups/backup.log 2>&1
+```
+
+The script restricts the backup directory to its owner (`700`) and backup files to owner read/write (`600`).
+Docker creates the photo archive with the host user's UID and GID and a private umask.
+Run the script as the intended backup owner. That user must have Docker access and read access to the photos.
+
+Restrict existing backups and logs before the next scheduled backup. Run these commands as their owner:
+
+```bash
+chmod 700 "$HOME/kitten-backups"
+find "$HOME/kitten-backups" -type f -exec chmod 600 {} +
+```
+
+If Docker created old files as root, an administrator must first transfer ownership to the intended backup owner.
+These commands restrict ordinary mode bits. Remove any additional ACL grants from the backup directory and files.
+
+Retention: last 14 days (`RETAIN_DAYS`). Copy backups to another machine over SSH (rsync/scp).
+Create the destination directory with mode `700` and restrict copied files to `600`.
+Do not use a shared account, public bucket, or publicly accessible folder for these copies.
+Encrypt off-host storage and restrict its access to the backup owner and authorized recovery administrators.
+Backups contain contact details, password hashes, and photos. Apply the same access restrictions to backup logs and temporary restore copies.
 
 **Restore** (replaces current data — verify the files first):
 
@@ -121,7 +186,7 @@ Pre-exposure checklist:
 
 - [ ] Router forwards **only 443** to the server; **no port 80**; NPM admin (81) stays LAN-only.
 - [ ] NPM: valid DNS-01 Let's Encrypt cert, **Force SSL**, **HSTS on**, HTTP/2 on.
-- [ ] Brute-force protection in front of login at the proxy layer (NPM access list / rate limiting), in addition to the app's per-IP login limit.
+- [ ] Brute-force protection in front of login at the proxy layer (NPM access list / rate limiting), in addition to the app's account and global login limits.
 - [ ] `ufw`: `allow from <admin-ip> to any port 81`; `allow 443` as needed; `default deny incoming`.
 - [ ] Strong, unique admin password; consider a second factor via the VPN/reverse-proxy auth in front.
 - [ ] Backups running and copied off-box; audit log reviewed periodically.
@@ -132,7 +197,10 @@ Because of the step-1 architecture (app behind NPM, no published port), exposure
 ## Security notes
 
 - Sessions: random 256-bit token in an httpOnly/secure/sameSite=lax cookie; only an HMAC of the token is stored. 30-day lifetime, sliding renewal.
-- Login rate-limited (5 / 15 min per IP); attempts recorded in the audit log.
+- Login verification limits: 5 attempts per account and 50 total attempts per 15 minutes, with at most 2 concurrent verifications. Success does not reset limits.
+- Forwarding headers are untrusted on both NPM and direct Tailscale routes. Login audit IP values are null.
+- The login action accepts at most 120 requests per minute before input validation. The proxy also limits login/action POST requests.
+- Limit state belongs to one standalone process. A restart clears it. Use shared limits before adding replicas.
 - Every mutation Zod-validated; Drizzle only (no raw SQL). Authorization checked server-side on every action; adopter PII and Settings are admin-only.
 - Interested-party contact details are PII and admin-only (omitted server-side for viewers, not just hidden in the UI). These are people who may never adopt — the Parties list carries an on-screen reminder to **prune parties who didn't proceed** rather than retaining contact data indefinitely without reason. Parties are excluded from the vet export.
 - Upload pipeline: magic-byte content sniffing (not extension/MIME), 15 MB cap, **always re-encoded** with sharp to WebP (neutralises embedded payloads, strips EXIF **and GPS**), UUID filenames outside any static path, served only through an authenticated route with a path-traversal guard.
