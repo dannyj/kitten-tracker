@@ -104,5 +104,7 @@ Full instructions, prerequisites, and gotchas are in [SETUP.md](SETUP.md).
 | [GLOSSARY.md](GLOSSARY.md) | Domain and technical terminology. |
 | [ERROR_PATTERNS.md](ERROR_PATTERNS.md) | Common failures and how to fix them. |
 | [HANDOFF_TEMPLATE.md](HANDOFF_TEMPLATE.md) | Prompt template for handing tasks to an AI agent. |
+| [MOBILE_RELEASE_SPEC.md](MOBILE_RELEASE_SPEC.md) | Planned mobile web app scope, architecture, acceptance checks, and release requirements. |
+| [MOBILE_AGENT_BRIEFS.md](MOBILE_AGENT_BRIEFS.md) | Lead, installation, mobile interface, and verification agent tasks. |
 
 The root [README.md](../README.md) covers production deploy, backups, and the security/exposure runbook.
